@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MapPin, Calendar, Sparkles, Plus, X, AlertCircle, Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
 import { Trip } from '@/types';
 import { autocompletePlaces, isPlacesApiConfigured } from '@/services/placesService';
 import { searchCities, createTrip } from '@/services/supabaseService';
+import DatePicker from '@/components/DatePicker';
 
 interface CreateTripProps {
   userId: string;
@@ -19,9 +21,13 @@ interface CitySearchResult {
 const CreateTrip: React.FC<CreateTripProps> = ({ userId }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  
+  // Default start date to today
+  const today = format(new Date(), 'yyyy-MM-dd');
+  
   const [formData, setFormData] = useState({
     name: '',
-    startDate: '',
+    startDate: today,
     endDate: '',
     description: '',
     destination: searchParams.get('destination') || ''
@@ -322,14 +328,11 @@ const CreateTrip: React.FC<CreateTripProps> = ({ userId }) => {
               <Calendar className="w-4 h-4" />
               Start Date
             </label>
-            <input
-              name="startDate"
-              type="date"
-              required
+            <DatePicker
               value={formData.startDate}
-              onChange={handleChange}
-              min={new Date().toISOString().split('T')[0]}
-              className="input-field"
+              onChange={(date) => setFormData(prev => ({ ...prev, startDate: date }))}
+              minDate={today}
+              placeholder="Select start date"
             />
           </div>
           
@@ -338,14 +341,11 @@ const CreateTrip: React.FC<CreateTripProps> = ({ userId }) => {
               <Calendar className="w-4 h-4" />
               End Date
             </label>
-            <input
-              name="endDate"
-              type="date"
-              required
+            <DatePicker
               value={formData.endDate}
-              onChange={handleChange}
-              min={formData.startDate || new Date().toISOString().split('T')[0]}
-              className="input-field"
+              onChange={(date) => setFormData(prev => ({ ...prev, endDate: date }))}
+              minDate={formData.startDate || today}
+              placeholder="Select end date"
             />
           </div>
         </div>

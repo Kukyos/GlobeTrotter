@@ -368,6 +368,25 @@ export async function searchCities(query: string): Promise<{ cities: any[]; erro
   }
 }
 
+// Get all cities (for browse/explore)
+export async function getAllCities(): Promise<{ cities: any[]; error: string | null }> {
+  try {
+    const { data, error } = await withTimeout(supabase
+      .from('cities')
+      .select('*')
+      .order('popularity', { ascending: false })
+      .limit(100), 8000);
+
+    if (error) {
+      return { cities: [], error: error.message };
+    }
+
+    return { cities: data || [], error: null };
+  } catch (err: any) {
+    return { cities: [], error: null };
+  }
+}
+
 /**
  * Chat History Service
  */

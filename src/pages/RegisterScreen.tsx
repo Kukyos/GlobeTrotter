@@ -491,9 +491,9 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onLogin }) => {
               />
               <label htmlFor="terms" className="text-sm text-white/50">
                 I agree to the{' '}
-                <button type="button" className="text-white hover:underline">
+                <Link to="/terms" className="text-white hover:underline">
                   Terms of Service
-                </button>{' '}
+                </Link>{' '}
                 and{' '}
                 <button type="button" className="text-white hover:underline">
                   Privacy Policy

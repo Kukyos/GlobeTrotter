@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Eye,
@@ -10,7 +10,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import type { Trip, Stop, Activity } from "../types/trip";
+import { getTrip, getStops, updateStop as updateStopApi, createStop, deleteStop as deleteStopApi } from "../services/supabaseService";
+import type { Trip, Stop, Activity } from "../types";
 
 /**
  * ItineraryBuilder.tsx
@@ -21,60 +22,39 @@ import type { Trip, Stop, Activity } from "../types/trip";
  * - Interactive interface to add Cities/Stops to a trip.
  * - Allow reordering of stops (Move Up/Down).
  * - StopSection component with drag handle (move buttons), date range, activity list.
- *
- * Component signature:
- * interface ItineraryBuilderProps {
- *   trips: Trip[];
- *   stops: Stop[];
- *   setStops: React.Dispatch<React.SetStateAction<Stop[]>>;
- * }
  */
 
-/* ---------------- Mock API (simulated) ---------------- */
-const mockGetTrip = (tripId: string): Promise<Trip> =>
-  new Promise((resolve) =>
-    setTimeout(
-      () =>
-        resolve({
-          id: tripId,
-          userId: "member-b",
-          name: "Sample Trip",
-          destination: "Various",
-          startDate: format(new Date(), "yyyy-MM-dd"),
-          endDate: format(new Date(), "yyyy-MM-dd"),
-          status: "upcoming",
-        }),
-      350
-    )
-  );
+// Helper to map Supabase trip (snake_case) to frontend Trip (camelCase)
+const mapSupabaseTrip = (dbTrip: any): Trip => ({
+  id: dbTrip.id,
+  userId: dbTrip.user_id,
+  name: dbTrip.name,
+  destination: dbTrip.destination || dbTrip.name,
+  description: dbTrip.description || undefined,
+  startDate: dbTrip.start_date,
+  endDate: dbTrip.end_date,
+  coverPhoto: dbTrip.cover_photo || undefined,
+  status: dbTrip.status,
+  isPublic: dbTrip.is_public,
+  totalBudget: dbTrip.total_budget,
+  createdAt: dbTrip.created_at,
+  updatedAt: dbTrip.updated_at,
+  stops: [],
+});
 
-const mockGetStops = (tripId: string): Promise<Stop[]> =>
-  new Promise((resolve) =>
-    setTimeout(
-      () =>
-        resolve([
-          {
-            id: "stop-1",
-            tripId,
-            cityName: "Lisbon",
-            country: "Portugal",
-            startDate: format(new Date(), "yyyy-MM-dd"),
-            endDate: format(new Date(), "yyyy-MM-dd"),
-            budget: 500,
-          },
-          {
-            id: "stop-2",
-            tripId,
-            cityName: "Seville",
-            country: "Spain",
-            startDate: format(new Date(), "yyyy-MM-dd"),
-            endDate: format(new Date(), "yyyy-MM-dd"),
-            budget: 300,
-          },
-        ]),
-      400
-    )
-  );
+// Helper to map Supabase stop (snake_case) to frontend Stop (camelCase)
+const mapSupabaseStop = (dbStop: any): Stop => ({
+  id: dbStop.id,
+  tripId: dbStop.trip_id,
+  cityId: dbStop.city_id,
+  cityName: dbStop.city_name,
+  country: dbStop.country,
+  startDate: dbStop.start_date,
+  endDate: dbStop.end_date,
+  order: dbStop.order_index,
+  budget: dbStop.budget,
+  notes: dbStop.notes,
+});
 
 /* ---------------- Helpers ---------------- */
 const formatDate = (iso?: string) => {
@@ -235,21 +215,53 @@ interface ItineraryBuilderProps {
   initialStops?: Stop[];
 }
 
-const ItineraryBuilder: React.FC<ItineraryBuilderProps> = ({ tripId = "trip-1", initialStops = [] }) => {
+const ItineraryBuilder: React.FC<ItineraryBuilderProps> = ({ tripId: propTripId, initialStops = [] }) => {
+  const { tripId: paramTripId } = useParams<{ tripId: string }>();
+  // Use propTripId if provided and non-empty, otherwise use URL param
+  const tripId = (propTripId && propTripId.trim()) ? propTripId : paramTripId;
+  
   const [trip, setTrip] = useState<Trip | null>(null);
   const [stops, setStops] = useState<Stop[]>(initialStops);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
+      if (!tripId) {
+        setError("No trip ID provided");
+        setIsLoading(false);
+        return;
+      }
+      
       setIsLoading(true);
-      const [t, s] = await Promise.all([mockGetTrip(tripId), mockGetStops(tripId)]);
+      setError(null);
+      
+      // Fetch trip and stops from Supabase
+      const [tripResult, stopsResult] = await Promise.all([
+        getTrip(tripId),
+        getStops(tripId)
+      ]);
+      
       if (!mounted) return;
-      setTrip(t);
-      setStops(s);
+      
+      if (tripResult.error) {
+        setError(tripResult.error);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (!tripResult.trip) {
+        setError("Trip not found");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Map snake_case to camelCase
+      setTrip(mapSupabaseTrip(tripResult.trip));
+      setStops((stopsResult.stops || []).map(mapSupabaseStop));
       // activities would be fetched per-stop in a real app; keep empty sample here
       setActivities([]);
       setIsLoading(false);
@@ -262,6 +274,7 @@ const ItineraryBuilder: React.FC<ItineraryBuilderProps> = ({ tripId = "trip-1", 
   }, [tripId, initialStops.length]);
 
   const addNewStop = () => {
+    if (!tripId) return;
     const newStop: Stop = {
       id: `stop-${Date.now()}`,
       tripId: tripId,
@@ -269,6 +282,7 @@ const ItineraryBuilder: React.FC<ItineraryBuilderProps> = ({ tripId = "trip-1", 
       country: "Country",
       startDate: format(new Date(), "yyyy-MM-dd"),
       endDate: format(new Date(), "yyyy-MM-dd"),
+      order: stops.length,
       budget: 0,
     };
     setStops((prev) => [...prev, newStop]);
@@ -309,6 +323,25 @@ const ItineraryBuilder: React.FC<ItineraryBuilderProps> = ({ tripId = "trip-1", 
   const preview = () => {
     alert("Preview (mock)");
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-white/50 animate-pulse">Loading itinerary builder...</div>
+      </div>
+    );
+  }
+
+  if (error || !trip) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <div className="text-white/50">{error || "Trip not found"}</div>
+        <Link to="/my-trips" className="btn-secondary">
+          Back to My Trips
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl p-6 space-y-6">
@@ -365,9 +398,6 @@ const ItineraryBuilder: React.FC<ItineraryBuilderProps> = ({ tripId = "trip-1", 
 
       {/* Dirty indicator */}
       {isDirty && <div className="text-sm text-yellow-300">You have unsaved changes.</div>}
-
-      {/* Loading overlay */}
-      {isLoading && <div className="text-sm text-white/50">Loading...</div>}
     </div>
   );
 };

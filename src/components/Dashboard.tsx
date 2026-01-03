@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { User, Trip } from '../types';
 import { Calendar, ArrowRight, Plus } from 'lucide-react';
 
@@ -17,7 +17,21 @@ const FEATURED_DESTINATIONS = [
 ];
 
 const Dashboard: React.FC<DashboardProps> = ({ user, trips }) => {
+  const navigate = useNavigate();
   const recentTrips = trips.slice(-3).reverse();
+
+  // Handle destination click - navigate to create trip with destination pre-selected
+  const handleDestinationClick = (destName: string) => {
+    navigate(`/create-trip?destination=${encodeURIComponent(destName)}`);
+  };
+
+  // Handle Browse Atlas click - open the search overlay
+  const handleBrowseAtlas = () => {
+    // Trigger the global search function exposed by Navigation
+    if ((window as any).openGlobeTrotterSearch) {
+      (window as any).openGlobeTrotterSearch();
+    }
+  };
 
   return (
     <div className="space-y-20 animate-in fade-in slide-in-from-bottom-4 duration-1000">
@@ -54,7 +68,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, trips }) => {
             <p className="text-white/40 font-light">Destinations chosen for the discerning traveler</p>
           </div>
           <button 
-            onClick={() => console.log('Browse Atlas - Member C search overlay')}
+            onClick={handleBrowseAtlas}
             className="text-sm font-bold border-b border-white/20 hover:border-white transition-all pb-1"
           >
             Browse Atlas
@@ -67,7 +81,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, trips }) => {
               key={i} 
               className="group relative aspect-[3/4] rounded-3xl overflow-hidden border border-white/10 hover:border-white/40 transition-all cursor-pointer hover-lift animate-fade-in-up"
               style={{ animationDelay: `${i * 100}ms` }}
-              onClick={() => console.log(`Clicked ${dest.name} - Member C to handle`)}
+              onClick={() => handleDestinationClick(dest.name)}
             >
               <img 
                 src={dest.img} 

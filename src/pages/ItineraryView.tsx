@@ -9,8 +9,9 @@ import {
   DollarSign,
   Clock,
 } from "lucide-react";
-import { format, parseISO, differenceInCalendarDays } from "date-fns";
-import type { Trip, Stop } from "../types/trip";
+import { parseISO, differenceInCalendarDays } from "date-fns";
+import { getTrip, getStops } from "../services/supabaseService";
+import type { Trip, Stop } from "../types";
 
 /**
  * ItineraryView.tsx
@@ -21,69 +22,44 @@ import type { Trip, Stop } from "../types/trip";
  * Users can navigate to the builder to edit.
  */
 
-/* ---------------- Mock API (simulated) ---------------- */
-const mockGetTrip = (tripId: string): Promise<Trip> =>
-  new Promise((resolve) =>
-    setTimeout(
-      () =>
-        resolve({
-          id: tripId,
-          userId: "member-b",
-          name: "European Adventure",
-          destination: "Various",
-          startDate: format(new Date(), "yyyy-MM-dd"),
-          endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
-          status: "upcoming",
-          description: "An amazing journey through Europe's most beautiful cities.",
-          coverPhoto: "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80",
-          totalBudget: 5000,
-        }),
-      350
-    )
-  );
+// Helper to map Supabase trip (snake_case) to frontend Trip (camelCase)
+const mapSupabaseTrip = (dbTrip: any): Trip => ({
+  id: dbTrip.id,
+  userId: dbTrip.user_id,
+  name: dbTrip.name,
+  destination: dbTrip.destination || dbTrip.name,
+  description: dbTrip.description || undefined,
+  startDate: dbTrip.start_date,
+  endDate: dbTrip.end_date,
+  coverPhoto: dbTrip.cover_photo || undefined,
+  status: dbTrip.status,
+  isPublic: dbTrip.is_public,
+  totalBudget: dbTrip.total_budget,
+  createdAt: dbTrip.created_at,
+  updatedAt: dbTrip.updated_at,
+  stops: [],
+});
 
-const mockGetStops = (tripId: string): Promise<Stop[]> =>
-  new Promise((resolve) =>
-    setTimeout(
-      () =>
-        resolve([
-          {
-            id: "stop-1",
-            tripId,
-            cityName: "Lisbon",
-            country: "Portugal",
-            startDate: format(new Date(), "yyyy-MM-dd"),
-            endDate: format(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
-            budget: 800,
-          },
-          {
-            id: "stop-2",
-            tripId,
-            cityName: "Seville",
-            country: "Spain",
-            startDate: format(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
-            endDate: format(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
-            budget: 600,
-          },
-          {
-            id: "stop-3",
-            tripId,
-            cityName: "Barcelona",
-            country: "Spain",
-            startDate: format(new Date(Date.now() + 6 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
-            endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
-            budget: 900,
-          },
-        ]),
-      400
-    )
-  );
+// Helper to map Supabase stop (snake_case) to frontend Stop (camelCase)
+const mapSupabaseStop = (dbStop: any): Stop => ({
+  id: dbStop.id,
+  tripId: dbStop.trip_id,
+  cityId: dbStop.city_id,
+  cityName: dbStop.city_name,
+  country: dbStop.country,
+  startDate: dbStop.start_date,
+  endDate: dbStop.end_date,
+  order: dbStop.order_index,
+  budget: dbStop.budget,
+  notes: dbStop.notes,
+});
 
 /* ---------------- Helpers ---------------- */
 const formatDate = (iso?: string) => {
   if (!iso) return "";
   try {
-    return format(parseISO(iso), "MMM d, yyyy");
+    const date = parseISO(iso);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   } catch {
     return iso;
   }
@@ -156,20 +132,49 @@ interface ItineraryViewProps {
 
 const ItineraryView: React.FC<ItineraryViewProps> = ({ tripId: propTripId }) => {
   const { tripId: paramTripId } = useParams<{ tripId: string }>();
-  const tripId = propTripId || paramTripId || "trip-1";
+  // Use propTripId if provided and non-empty, otherwise use URL param
+  const tripId = (propTripId && propTripId.trim()) ? propTripId : paramTripId;
   
   const [trip, setTrip] = useState<Trip | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
+      if (!tripId) {
+        setError("No trip ID provided");
+        setIsLoading(false);
+        return;
+      }
+      
       setIsLoading(true);
-      const [t, s] = await Promise.all([mockGetTrip(tripId), mockGetStops(tripId)]);
+      setError(null);
+      
+      // Fetch trip and stops from Supabase
+      const [tripResult, stopsResult] = await Promise.all([
+        getTrip(tripId),
+        getStops(tripId)
+      ]);
+      
       if (!mounted) return;
-      setTrip(t);
-      setStops(s);
+      
+      if (tripResult.error) {
+        setError(tripResult.error);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (!tripResult.trip) {
+        setError("Trip not found");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Map snake_case to camelCase
+      setTrip(mapSupabaseTrip(tripResult.trip));
+      setStops((stopsResult.stops || []).map(mapSupabaseStop));
       setIsLoading(false);
     };
     load();
@@ -189,10 +194,13 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({ tripId: propTripId }) => 
     );
   }
 
-  if (!trip) {
+  if (error || !trip) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-white/50">Trip not found</div>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <div className="text-white/50">{error || "Trip not found"}</div>
+        <Link to="/my-trips" className="btn-secondary">
+          Back to My Trips
+        </Link>
       </div>
     );
   }

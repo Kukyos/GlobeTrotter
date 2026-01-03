@@ -43,6 +43,7 @@ export interface Trip {
   id: string;
   userId: string;
   name: string;
+  destination?: string;
   description?: string;
   startDate: string;
   endDate: string;
@@ -52,6 +53,7 @@ export interface Trip {
   totalBudget?: number;
   createdAt: string;
   updatedAt?: string;
+  stops?: Stop[];
 }
 
 /**
@@ -61,12 +63,13 @@ export interface Trip {
 export interface Stop {
   id: string;
   tripId: string;
-  cityId: string;
+  cityId?: string;
   cityName: string;
   country: string;
   startDate: string;
   endDate: string;
   order: number;
+  budget?: number;
   notes?: string;
 }
 

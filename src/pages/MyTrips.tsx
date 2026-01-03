@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Search, Calendar as CalendarIcon, CheckCircle, Plane, Trash2 } from "lucide-react";
-import { format, differenceInCalendarDays, parseISO } from "date-fns";
-import type { Trip } from "../types/trip";
+import { differenceInCalendarDays, parseISO } from "date-fns";
+import { getTrips, deleteTrip } from "../services/supabaseService";
+import type { Trip } from "../types";
 
 /**
  * MyTrips.tsx
@@ -13,73 +14,32 @@ import type { Trip } from "../types/trip";
  * - Search, Group By, Filter, Sort controls
  * - List grouped by status: ongoing, upcoming, completed
  * - TripListCard sub-component with actions: View, Edit, Delete
- *
- * Component signature:
- * interface MyTripsProps {
- *   trips: Trip[];
- *   setTrips: React.Dispatch<React.SetStateAction<Trip[]>>;
- * }
  */
 
-/* ---------------- Mock API (structure only, simulated latency) ---------------- */
-const mockGetTrips = (): Promise<Trip[]> =>
-  new Promise((resolve) => {
-    setTimeout(() => {
-      const now = new Date();
-      const addDays = (d: Date, days: number) => new Date(d.getTime() + days * 86400000);
-      const sample: Trip[] = [
-        {
-          id: "t1",
-          userId: "member-b",
-          name: "Lisbon Weekend",
-          destination: "Lisbon, Portugal",
-          startDate: format(addDays(now, -1), "yyyy-MM-dd"),
-          endDate: format(addDays(now, 2), "yyyy-MM-dd"),
-          description: "Explore the Alfama and eat pastel de nata.",
-          coverPhoto: "https://images.unsplash.com/photo-1505238680356-667803448bb6?w=800&q=60",
-          totalBudget: 800,
-          status: "ongoing",
-          stops: [{ id: "s1", tripId: "t1", cityName: "Lisbon", country: "Portugal", startDate: format(addDays(now, -1), "yyyy-MM-dd"), endDate: format(addDays(now, 2), "yyyy-MM-dd") }],
-        },
-        {
-          id: "t2",
-          userId: "member-b",
-          name: "Paris in Spring",
-          destination: "Paris, France",
-          startDate: format(addDays(now, 10), "yyyy-MM-dd"),
-          endDate: format(addDays(now, 16), "yyyy-MM-dd"),
-          description: "Museums and cafes.",
-          coverPhoto: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&q=60",
-          totalBudget: 2200,
-          status: "upcoming",
-          stops: [],
-        },
-        {
-          id: "t3",
-          userId: "member-b",
-          name: "Kyoto Autumn",
-          destination: "Kyoto, Japan",
-          startDate: format(addDays(now, -40), "yyyy-MM-dd"),
-          endDate: format(addDays(now, -35), "yyyy-MM-dd"),
-          description: "Temples and maple leaves.",
-          coverPhoto: undefined,
-          totalBudget: 3000,
-          status: "completed",
-          stops: [],
-        },
-      ];
-      resolve(sample);
-    }, 400);
-  });
-
-const mockDeleteTrip = (id: string): Promise<{ ok: boolean }> =>
-  new Promise((resolve) => setTimeout(() => resolve({ ok: true }), 300));
+// Helper to map Supabase trip (snake_case) to frontend Trip (camelCase)
+const mapSupabaseTrip = (dbTrip: any): Trip => ({
+  id: dbTrip.id,
+  userId: dbTrip.user_id,
+  name: dbTrip.name,
+  description: dbTrip.description || undefined,
+  startDate: dbTrip.start_date,
+  endDate: dbTrip.end_date,
+  coverPhoto: dbTrip.cover_photo || undefined,
+  status: dbTrip.status,
+  isPublic: dbTrip.is_public,
+  totalBudget: dbTrip.total_budget,
+  createdAt: dbTrip.created_at,
+  updatedAt: dbTrip.updated_at,
+  destination: dbTrip.destination || dbTrip.name,
+  stops: [],
+});
 
 /* ---------------- Utility helpers ---------------- */
 const formatDate = (isoDate?: string) => {
   if (!isoDate) return "";
   try {
-    return format(parseISO(isoDate), "MMM d, yyyy");
+    const date = parseISO(isoDate);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   } catch {
     return isoDate;
   }
@@ -164,23 +124,31 @@ const MyTrips: React.FC<MyTripsProps> = ({ trips, setTrips }) => {
   const [filter, setFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("date-desc");
 
-  // Load trips on mount if none provided
+  // Load trips on mount - always fetch from Supabase
   useEffect(() => {
     let mounted = true;
-    if (trips.length === 0) {
+    const loadTrips = async () => {
       setIsLoading(true);
-      mockGetTrips().then((res) => {
-        if (!mounted) return;
-        setTrips(res);
+      const { trips: dbTrips, error } = await getTrips();
+      if (!mounted) return;
+      
+      if (error) {
+        console.error('Failed to load trips:', error);
         setIsLoading(false);
-      });
-    } else {
+        return;
+      }
+      
+      // Map snake_case database fields to camelCase for frontend
+      const mappedTrips = dbTrips.map(mapSupabaseTrip);
+      setTrips(mappedTrips);
       setIsLoading(false);
-    }
+    };
+    
+    loadTrips();
     return () => {
       mounted = false;
     };
-  }, [setTrips, trips.length]);
+  }, [setTrips]);
 
   // Filtered + searched + sorted trips
   const processedTrips = useMemo(() => {
@@ -194,7 +162,7 @@ const MyTrips: React.FC<MyTripsProps> = ({ trips, setTrips }) => {
     // Search by name or destination
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      out = out.filter((t) => t.name.toLowerCase().includes(q) || t.destination.toLowerCase().includes(q));
+      out = out.filter((t) => t.name.toLowerCase().includes(q) || (t.destination && t.destination.toLowerCase().includes(q)));
     }
 
     // Sort
@@ -221,6 +189,7 @@ const MyTrips: React.FC<MyTripsProps> = ({ trips, setTrips }) => {
   const ongoingTrips = processedTrips.filter((t) => t.status === "ongoing");
   const upcomingTrips = processedTrips.filter((t) => t.status === "upcoming");
   const completedTrips = processedTrips.filter((t) => t.status === "completed");
+  const draftTrips = processedTrips.filter((t) => t.status === "draft" || !t.status);
 
   /* Handlers for card actions */
   const handleView = (trip: Trip) => {
@@ -241,16 +210,15 @@ const MyTrips: React.FC<MyTripsProps> = ({ trips, setTrips }) => {
     const prev = [...trips];
     setTrips((cur) => cur.filter((t) => t.id !== trip.id));
     try {
-      const res = await mockDeleteTrip(trip.id);
-      if (!res.ok) {
-        throw new Error("Delete failed");
+      const { error } = await deleteTrip(trip.id);
+      if (error) {
+        throw new Error(error);
       }
     } catch (err) {
       // rollback
       setTrips(prev);
-      // eslint-disable-next-line no-console
       console.error(err);
-      alert("Failed to delete trip (mock).");
+      alert("Failed to delete trip.");
     }
   };
 
@@ -388,8 +356,29 @@ const MyTrips: React.FC<MyTripsProps> = ({ trips, setTrips }) => {
             </section>
           )}
 
+          {/* Draft Section */}
+          {draftTrips.length > 0 && (
+            <section className="mb-8">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Plane className="w-4 h-4 text-yellow-400" />
+                Drafts
+              </h2>
+              <div className="space-y-4">
+                {draftTrips.map((trip) => (
+                  <TripListCard
+                    key={trip.id}
+                    trip={trip}
+                    onView={() => handleView(trip)}
+                    onEdit={() => handleEdit(trip)}
+                    onDelete={() => handleDelete(trip)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Empty state */}
-          {ongoingTrips.length === 0 && upcomingTrips.length === 0 && completedTrips.length === 0 && (
+          {ongoingTrips.length === 0 && upcomingTrips.length === 0 && completedTrips.length === 0 && draftTrips.length === 0 && (
             <div className="text-sm text-white/50">No trips found for the current filters.</div>
           )}
         </>

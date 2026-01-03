@@ -8,7 +8,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase credentials not found. Please check your environment variables.');
 }
 
-// Create Supabase client
+// Create Supabase client with persistent session (never expires)
 export const supabase = createClient(
   supabaseUrl || '',
   supabaseAnonKey || '',
@@ -17,6 +17,9 @@ export const supabase = createClient(
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
+      storage: localStorage,
+      storageKey: 'globetrotter-auth',
+      flowType: 'pkce',
     },
   }
 );

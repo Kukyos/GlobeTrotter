@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Trip } from '@/types';
-import { LoginScreen, RegisterScreen, CreateTrip, MyTrips, ItineraryBuilder, ItineraryView, Calendar, ProfileSettings } from '@/pages';
+import { LoginScreen, RegisterScreen, CreateTrip, MyTrips, ItineraryBuilder, ItineraryView, Calendar, ProfileSettings, TermsOfService } from '@/pages';
 import Navigation from '@/components/Navigation';
 import Dashboard from '@/components/Dashboard';
 import TravelChatbot from '@/components/TravelChatbot';
@@ -25,7 +25,7 @@ const pageVariants = {
 
 const pageTransition = {
   duration: 0.3,
-  ease: "easeInOut"
+  ease: "easeInOut" as const
 };
 
 // Animated Routes wrapper component
@@ -84,6 +84,23 @@ function AnimatedRoutes({
                   <RegisterScreen onLogin={handleLogin} />
                 </motion.div>
               )
+          } 
+        />
+
+        {/* Terms of Service - Public route */}
+        <Route 
+          path="/terms" 
+          element={
+            <motion.div 
+              className="max-w-7xl mx-auto px-6 py-24"
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              variants={pageVariants}
+              transition={pageTransition}
+            >
+              <TermsOfService />
+            </motion.div>
           } 
         />
         
