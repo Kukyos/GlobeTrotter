@@ -220,6 +220,16 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
               <Calendar className="w-4 h-4" />
               <span className="hidden sm:inline">Calendar</span>
             </Link>
+            <Link 
+              to="/community" 
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                location.pathname === '/community'
+                  ? 'bg-white/10 text-white' 
+                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              Community
+            </Link>
           </div>
 
           <div className="w-px h-6 bg-white/10" />

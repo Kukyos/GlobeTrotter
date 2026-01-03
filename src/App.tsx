@@ -1,16 +1,12 @@
-feature/admin-dashboard
-import AdminPanel from "./pages/AdminPanel";
-import ProfileSettings from "./pages/ProfileSettings";
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-main
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Trip } from '@/types';
 import { LoginScreen, RegisterScreen, CreateTrip, MyTrips, ItineraryBuilder, ItineraryView, Calendar, ProfileSettings, TermsOfService } from '@/pages';
+import AdminPanel from '@/pages/AdminPanel';
 import Navigation from '@/components/Navigation';
 import Dashboard from '@/components/Dashboard';
+import Community from '@/components/Community';
 import TravelChatbot from '@/components/TravelChatbot';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, signOut, getTrips } from '@/services/supabaseService';
@@ -244,6 +240,46 @@ function AnimatedRoutes({
                 transition={pageTransition}
               >
                 <ProfileSettings user={currentUser} setUser={setUser} />
+              </motion.div>
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
+
+        <Route 
+          path="/admin" 
+          element={
+            currentUser?.role === 'admin' ? (
+              <motion.div 
+                className="max-w-7xl mx-auto px-6 py-24"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                variants={pageVariants}
+                transition={pageTransition}
+              >
+                <AdminPanel user={currentUser} />
+              </motion.div>
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          } 
+        />
+
+        <Route 
+          path="/community" 
+          element={
+            currentUser ? (
+              <motion.div 
+                className="max-w-7xl mx-auto px-6 py-24"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                variants={pageVariants}
+                transition={pageTransition}
+              >
+                <Community user={currentUser} />
               </motion.div>
             ) : (
               <Navigate to="/" replace />

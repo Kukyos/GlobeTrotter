@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Camera, Key, Bell, Trash2, Loader2, Save, MapPin } from "lucide-react";
+import { Camera, Key, Bell, Trash2, Loader2, Save, MapPin, Shield } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { User, Trip } from "../types";
 import { getTrips, updateProfile, signOut } from "../services/supabaseService";
@@ -362,6 +362,17 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ user, setUser }) => {
         <h2 className="text-lg font-semibold text-white mb-4">Account Settings</h2>
 
         <div className="space-y-3">
+          {/* Admin Panel - only shown to admins */}
+          {user.role === 'admin' && (
+            <Link
+              to="/admin"
+              className="btn-secondary w-full justify-start flex items-center gap-3 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-indigo-500/30 hover:border-indigo-500/50"
+            >
+              <Shield className="w-4 h-4 text-indigo-400" /> 
+              <span className="text-indigo-300">Admin Dashboard</span>
+            </Link>
+          )}
+
           <button
             type="button"
             onClick={() => alert("Password change coming soon!")}
