@@ -5,6 +5,7 @@ import { User, Trip } from '@/types';
 import { LoginScreen, RegisterScreen, CreateTrip, MyTrips, ItineraryBuilder, ItineraryView } from '@/pages';
 import Navigation from '@/components/Navigation';
 import Dashboard from '@/components/Dashboard';
+import Community from '@/components/Community';
 import TravelChatbot from '@/components/TravelChatbot';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, signOut, getTrips } from '@/services/supabaseService';
@@ -99,6 +100,25 @@ function AnimatedRoutes({
                 transition={pageTransition}
               >
                 <Dashboard user={currentUser} trips={trips} />
+              </motion.div>
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
+        
+        <Route 
+          path="/community" 
+          element={
+            currentUser ? (
+              <motion.div
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                variants={pageVariants}
+                transition={pageTransition}
+              >
+                <Community user={currentUser} />
               </motion.div>
             ) : (
               <Navigate to="/" replace />
@@ -215,78 +235,19 @@ function App() {
 
   // Check for existing session on mount with timeout
   useEffect(() => {
-    let isMounted = true;
+    // Disabled Supabase auth - using local MySQL backend
+    setIsLoading(false);
+    setLoadingError(null);
     
-    const checkSession = async () => {
-      setIsLoading(true);
-      setLoadingError(null);
-      
-      try {
-        // Get user with timeout
-        const user = await withTimeout(
-          getCurrentUser(),
-          AUTH_TIMEOUT,
-          null
-        );
-        
-        if (!isMounted) return;
-        
-        if (user) {
-          setCurrentUser(user);
-          // Fetch trips with timeout - don't block on this
-          withTimeout(
-            getTrips(),
-            TRIPS_TIMEOUT,
-            { trips: [], error: 'Timeout loading trips' }
-          ).then(({ trips: userTrips }) => {
-            if (isMounted) setTrips(userTrips as any);
-          });
-        }
-      } catch (err) {
-        console.error('Session check failed:', err);
-        if (isMounted) setLoadingError('Connection issue. Please refresh.');
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-
-    // Fallback timeout - ensure we never load forever
-    const fallbackTimer = setTimeout(() => {
-      if (isMounted && isLoading) {
-        setIsLoading(false);
-        setLoadingError('Loading took too long. Please refresh.');
-      }
-    }, AUTH_TIMEOUT + 2000);
-
-    checkSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const user = await withTimeout(getCurrentUser(), AUTH_TIMEOUT, null);
-        if (user && isMounted) {
-          setCurrentUser(user);
-          const { trips: userTrips } = await withTimeout(
-            getTrips(),
-            TRIPS_TIMEOUT,
-            { trips: [], error: null }
-          );
-          if (isMounted) setTrips(userTrips as any);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        if (isMounted) {
-          setCurrentUser(null);
-          setTrips([]);
-        }
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      clearTimeout(fallbackTimer);
-      subscription.unsubscribe();
-    };
+    // Supabase auth commented out - will be restored when Supabase is configured
+    // let isMounted = true;
+    // const checkSession = async () => { ... };
+    // const fallbackTimer = setTimeout(() => { ... }, AUTH_TIMEOUT + 2000);
+    // checkSession();
+    // const { data: { subscription } } = supabase.auth.onAuthStateChange(...);
+    // return () => { isMounted = false; clearTimeout(fallbackTimer); subscription.unsubscribe(); };
   }, []);
+
 
   // Auth handlers
   const handleLogin = (user: User) => {

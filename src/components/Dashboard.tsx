@@ -135,16 +135,192 @@ const Dashboard: React.FC<DashboardProps> = ({ user, trips }) => {
         )}
       </section>
 
-      {/* Signature Travel Quote */}
-      <section className="py-24 border-t border-white/10 text-center space-y-8">
-        <div className="max-w-3xl mx-auto">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-white/10 mx-auto mb-8" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M14.017 21L14.017 18C14.017 16.8954 14.9124 16 16.017 16H19.017C19.5693 16 20.017 15.5523 20.017 15V9C20.017 8.44772 19.5693 8 19.017 8H16.017C14.9124 8 14.017 7.10457 14.017 6V5C14.017 3.89543 14.9124 3 16.017 3H21.017C22.1216 3 23.017 3.89543 23.017 5V15C23.017 18.3137 20.3307 21 17.017 21H14.017ZM1.017 21L1.017 18C1.017 16.8954 1.91243 16 3.017 16H6.017C6.56928 16 7.017 15.5523 7.017 15V9C7.017 8.44772 6.56928 8 6.017 8H3.017C1.91243 8 1.017 7.10457 1.017 6V5C1.017 3.89543 1.91243 3 3.017 3H8.017C9.12157 3 10.017 3.89543 10.017 5V15C10.017 18.3137 7.33066 21 4.017 21H1.017Z" />
-          </svg>
-          <p className="text-3xl md:text-5xl font-heading font-bold italic leading-tight text-white/90">
-            "Travel makes one modest. You see what a tiny place you occupy in the world."
-          </p>
-          <p className="mt-8 text-white/30 font-bold uppercase tracking-[0.4em] text-xs">— Gustave Flaubert</p>
+      {/* Trending Places - User Reviews */}
+      <section className="space-y-8">
+        <div className="space-y-2">
+          <h3 className="text-4xl font-bold font-heading">Trending Now</h3>
+          <p className="text-white/40 font-light">Top destinations our travelers are raving about</p>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Side - Trending Place Tiles */}
+          <div className="space-y-4">
+            {/* Tile 1 - Large */}
+            <div className="relative h-[300px] rounded-3xl overflow-hidden group cursor-pointer border border-white/10 hover:border-white/30 transition-all">
+              <img 
+                src="https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?q=80&w=1200&auto=format&fit=crop" 
+                alt="Santorini"
+                className="w-full h-full object-cover brightness-[0.7] group-hover:scale-110 transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-8 flex flex-col justify-end">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/30">🔥 Hot</span>
+                  <span className="text-xs text-white/60">234 reviews</span>
+                </div>
+                <h4 className="text-3xl font-bold font-heading mb-2">Santorini</h4>
+                <p className="text-sm text-white/60">Greece • Mediterranean Paradise</p>
+              </div>
+            </div>
+
+            {/* Tiles 2 & 3 - Side by side */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="relative h-[200px] rounded-3xl overflow-hidden group cursor-pointer border border-white/10 hover:border-white/30 transition-all">
+                <img 
+                  src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=800&auto=format&fit=crop" 
+                  alt="Kyoto"
+                  className="w-full h-full object-cover brightness-[0.7] group-hover:scale-110 transition-transform duration-700"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent p-6 flex flex-col justify-end">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs text-white/60">189 reviews</span>
+                  </div>
+                  <h4 className="text-xl font-bold font-heading">Kyoto</h4>
+                  <p className="text-xs text-white/60">Japan</p>
+                </div>
+              </div>
+
+              <div className="relative h-[200px] rounded-3xl overflow-hidden group cursor-pointer border border-white/10 hover:border-white/30 transition-all">
+                <img 
+                  src="https://images.unsplash.com/photo-1504109586057-7a2ae83d1338?q=80&w=800&auto=format&fit=crop" 
+                  alt="Reykjavik"
+                  className="w-full h-full object-cover brightness-[0.7] group-hover:scale-110 transition-transform duration-700"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent p-6 flex flex-col justify-end">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs text-white/60">156 reviews</span>
+                  </div>
+                  <h4 className="text-xl font-bold font-heading">Reykjavik</h4>
+                  <p className="text-xs text-white/60">Iceland</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Side - Comments Feed */}
+          <div className="space-y-4">
+            {/* Comment 1 */}
+            <div className="glass border border-white/10 rounded-3xl p-6 space-y-4 hover:border-white/20 transition-all">
+              <div className="flex items-start gap-4">
+                <img 
+                  src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop" 
+                  alt="Sarah"
+                  className="w-12 h-12 rounded-full object-cover border-2 border-white/20"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h4 className="font-bold text-sm">Sarah Mitchell</h4>
+                      <p className="text-xs text-white/40">visited Santorini • 2 days ago</p>
+                    </div>
+                    <div className="flex gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <svg key={i} className="w-3 h-3 fill-yellow-400" viewBox="0 0 20 20">
+                          <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+                        </svg>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-sm text-white/70 leading-relaxed mb-3">
+                    Santorini exceeded all expectations! The sunset views from Oia are absolutely breathtaking. The local food was incredible and the people so warm.
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <button className="flex items-center gap-2 text-xs text-white/50 hover:text-white transition-colors group">
+                      <svg className="w-4 h-4 group-hover:fill-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                      <span className="font-medium">247</span>
+                    </button>
+                    <button className="text-xs text-white/50 hover:text-white transition-colors">Reply</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Comment 2 */}
+            <div className="glass border border-white/10 rounded-3xl p-6 space-y-4 hover:border-white/20 transition-all">
+              <div className="flex items-start gap-4">
+                <img 
+                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop" 
+                  alt="James"
+                  className="w-12 h-12 rounded-full object-cover border-2 border-white/20"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h4 className="font-bold text-sm">James Chen</h4>
+                      <p className="text-xs text-white/40">visited Kyoto • 5 days ago</p>
+                    </div>
+                    <div className="flex gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <svg key={i} className="w-3 h-3 fill-yellow-400" viewBox="0 0 20 20">
+                          <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+                        </svg>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-sm text-white/70 leading-relaxed mb-3">
+                    Kyoto's temples and traditional gardens are like stepping into another world. The cherry blossoms were in full bloom - pure magic.
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <button className="flex items-center gap-2 text-xs text-white/50 hover:text-white transition-colors group">
+                      <svg className="w-4 h-4 group-hover:fill-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                      <span className="font-medium">189</span>
+                    </button>
+                    <button className="text-xs text-white/50 hover:text-white transition-colors">Reply</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Comment 3 */}
+            <div className="glass border border-white/10 rounded-3xl p-6 space-y-4 hover:border-white/20 transition-all">
+              <div className="flex items-start gap-4">
+                <img 
+                  src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop" 
+                  alt="Emma"
+                  className="w-12 h-12 rounded-full object-cover border-2 border-white/20"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h4 className="font-bold text-sm">Emma Rodriguez</h4>
+                      <p className="text-xs text-white/40">visited Reykjavik • 1 week ago</p>
+                    </div>
+                    <div className="flex gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <svg key={i} className="w-3 h-3 fill-yellow-400" viewBox="0 0 20 20">
+                          <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+                        </svg>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-sm text-white/70 leading-relaxed mb-3">
+                    Iceland's natural beauty is unreal! Saw the Northern Lights, bathed in hot springs, and explored ice caves. Worth every penny!
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <button className="flex items-center gap-2 text-xs text-white/50 hover:text-white transition-colors group">
+                      <svg className="w-4 h-4 group-hover:fill-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                      <span className="font-medium">156</span>
+                    </button>
+                    <button className="text-xs text-white/50 hover:text-white transition-colors">Reply</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* View More Button */}
+            <Link 
+              to="/community"
+              className="w-full py-4 rounded-2xl border border-white/20 hover:border-white hover:bg-white/5 transition-all flex items-center justify-center gap-2 font-medium text-sm group"
+            >
+              View All Reviews in Community
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
         </div>
       </section>
     </div>

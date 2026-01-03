@@ -100,6 +100,9 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
                 <Link to="/my-trips" className={`text-sm font-medium transition-colors ${location.pathname === '/my-trips' ? 'text-white' : 'text-white/50 hover:text-white'}`}>
                   Trips
                 </Link>
+                <Link to="/community" className={`text-sm font-medium transition-colors ${location.pathname === '/community' ? 'text-white' : 'text-white/50 hover:text-white'}`}>
+                  Community
+                </Link>
               </div>
             
               <div 

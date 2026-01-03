@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Globe, Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
 import { User, UserRole } from '@/types';
-import { signIn } from '@/services/supabaseService';
+import api from '@/services/api';
 
 interface LoginScreenProps {
   onLogin: (user: User) => void;
@@ -61,30 +61,40 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     setIsLoading(true);
     
     try {
-      // Call Supabase Auth
-      const { user, error } = await signIn(formData.email, formData.password);
+      // Call local backend API
+      const response = await api.post('/auth/login', {
+        email: formData.email,
+        password: formData.password
+      });
       
       setIsLoading(false);
       
-      if (user && !error) {
+      if (response.data.success) {
+        const { token, user } = response.data.data; // Note: data is nested in response.data.data
+        
+        // Store token
+        localStorage.setItem('globetrotter_token', token);
+        localStorage.setItem('globetrotter_user', JSON.stringify(user));
+        
         const mappedUser: User = {
-          id: user.id,
-          email: user.email || '',
-          name: user.user_metadata?.name || user.email?.split('@')[0] || 'Traveler',
-          role: (user.user_metadata?.role as UserRole) || 'user',
-          avatar: user.user_metadata?.avatar || undefined
+          id: user.id.toString(),
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`.trim() || user.email.split('@')[0],
+          role: user.role || 'user',
+          avatar: user.photoUrl
         };
         onLogin(mappedUser);
         navigate('/dashboard');
       } else {
         setErrors({ 
-          email: error || 'Login failed. Please check your credentials.' 
+          email: response.data.message || 'Login failed. Please check your credentials.' 
         });
       }
-    } catch (err) {
+    } catch (err: any) {
       setIsLoading(false);
+      console.error('Login error:', err);
       setErrors({ 
-        email: 'An unexpected error occurred. Please try again.' 
+        email: err.response?.data?.message || 'An unexpected error occurred. Please try again.' 
       });
     }
   };
