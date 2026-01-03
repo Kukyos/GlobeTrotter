@@ -31,7 +31,10 @@ export const authService = {
    */
   async register(data: RegisterData): Promise<ApiResponse<AuthResponse>> {
     try {
+      console.log('Attempting registration for:', data.email);
       const response = await api.post<ApiResponse<AuthResponse>>('/auth/register', data);
+      
+      console.log('Registration response:', response.data);
       
       if (response.data.success && response.data.data) {
         // Store token and user in localStorage
@@ -41,9 +44,10 @@ export const authService = {
       
       return response.data;
     } catch (error: any) {
+      console.error('Registration error:', error.response?.data || error.message);
       return {
         success: false,
-        error: error.response?.data?.message || 'Registration failed',
+        error: error.response?.data?.message || error.message || 'Registration failed. Please try again.',
       };
     }
   },
@@ -53,7 +57,10 @@ export const authService = {
    */
   async login(data: LoginData): Promise<ApiResponse<AuthResponse>> {
     try {
+      console.log('Attempting login for:', data.email);
       const response = await api.post<ApiResponse<AuthResponse>>('/auth/login', data);
+      
+      console.log('Login response:', response.data);
       
       if (response.data.success && response.data.data) {
         // Store token and user in localStorage
@@ -63,9 +70,10 @@ export const authService = {
       
       return response.data;
     } catch (error: any) {
+      console.error('Login error:', error.response?.data || error.message);
       return {
         success: false,
-        error: error.response?.data?.message || 'Login failed',
+        error: error.response?.data?.message || error.message || 'Login failed. Please check your credentials.',
       };
     }
   },

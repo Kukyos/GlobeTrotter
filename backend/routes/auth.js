@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
+import { randomUUID } from 'crypto';
 import db from '../config/database.js';
 
 const router = express.Router();
@@ -23,10 +24,17 @@ router.post('/register',
       // Validate input
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, errors: errors.array() });
+        console.error('Validation errors:', errors.array());
+        return res.status(400).json({ 
+          success: false, 
+          message: errors.array()[0].msg,
+          errors: errors.array() 
+        });
       }
 
       const { email, password, firstName, lastName, phone, city, country, bio } = req.body;
+
+      console.log('Registration attempt for:', email);
 
       // Check if user already exists
       const [existingUsers] = await db.query(
@@ -35,6 +43,7 @@ router.post('/register',
       );
 
       if (existingUsers.length > 0) {
+        console.log('User already exists:', email);
         return res.status(400).json({ 
           success: false, 
           message: 'User with this email already exists' 
@@ -46,14 +55,18 @@ router.post('/register',
       const passwordHash = await bcrypt.hash(password, salt);
 
       // Generate UUID
-      const userId = crypto.randomUUID();
+      const userId = randomUUID();
+
+      console.log('Creating user with ID:', userId);
 
       // Insert user
       await db.query(
         `INSERT INTO users (id, email, password_hash, first_name, last_name, phone, city, country, bio, role, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', NOW())`,
-        [userId, email, passwordHash, firstName, lastName, phone, city, country, bio]
+        [userId, email, passwordHash, firstName, lastName, phone || null, city || null, country || null, bio || null]
       );
+
+      console.log('User created successfully:', email);
 
       // Create JWT token
       const token = jwt.sign(
@@ -73,10 +86,10 @@ router.post('/register',
             email,
             firstName,
             lastName,
-            phone,
-            city,
-            country,
-            bio,
+            phone: phone || null,
+            city: city || null,
+            country: country || null,
+            bio: bio || null,
             role: 'user',
             createdAt: new Date().toISOString()
           }
@@ -87,7 +100,8 @@ router.post('/register',
       console.error('Register error:', error);
       res.status(500).json({ 
         success: false, 
-        message: 'Server error during registration' 
+        message: 'Server error during registration',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
       });
     }
   }
@@ -108,10 +122,17 @@ router.post('/login',
       // Validate input
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, errors: errors.array() });
+        console.error('Login validation errors:', errors.array());
+        return res.status(400).json({ 
+          success: false, 
+          message: errors.array()[0].msg,
+          errors: errors.array() 
+        });
       }
 
       const { email, password } = req.body;
+
+      console.log('Login attempt for:', email);
 
       // Find user
       const [users] = await db.query(
@@ -120,9 +141,10 @@ router.post('/login',
       );
 
       if (users.length === 0) {
+        console.log('User not found:', email);
         return res.status(401).json({ 
           success: false, 
-          message: 'Invalid credentials' 
+          message: 'Invalid email or password' 
         });
       }
 
@@ -131,11 +153,14 @@ router.post('/login',
       // Check password
       const isMatch = await bcrypt.compare(password, user.password_hash);
       if (!isMatch) {
+        console.log('Invalid password for:', email);
         return res.status(401).json({ 
           success: false, 
-          message: 'Invalid credentials' 
+          message: 'Invalid email or password' 
         });
       }
+
+      console.log('Login successful for:', email);
 
       // Create JWT token
       const token = jwt.sign(
@@ -170,7 +195,8 @@ router.post('/login',
       console.error('Login error:', error);
       res.status(500).json({ 
         success: false, 
-        message: 'Server error during login' 
+        message: 'Server error during login',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
       });
     }
   }
