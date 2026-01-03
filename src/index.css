@@ -153,3 +153,68 @@ body {
   background: rgba(255, 255, 255, 0.2);
   color: white;
 }
+
+/* Progressive Search Styles */
+.search-container-progressive {
+  position: relative;
+}
+
+/* Smooth progressive width transitions */
+.search-container-progressive > div {
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Search input focus state */
+.search-container-progressive input:focus {
+  transform: scale(1.005);
+}
+
+/* Pinterest-style Masonry Grid */
+.masonry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+  grid-auto-rows: 20px;
+}
+
+.masonry-item {
+  animation: fadeInUp 0.4s ease-out forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dynamic heights for masonry effect */
+.masonry-item:nth-child(3n + 1) {
+  grid-row: span 12;
+}
+
+.masonry-item:nth-child(3n + 2) {
+  grid-row: span 10;
+}
+
+.masonry-item:nth-child(3n + 3) {
+  grid-row: span 14;
+}
+
+/* Hover effects */
+.masonry-item:hover {
+  transform: translateY(-4px);
+}
+
+/* Smooth overlay transitions */
+.fixed.inset-0 {
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Filter button animations */
+.masonry-grid + * button {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
