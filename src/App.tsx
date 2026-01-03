@@ -1,3 +1,5 @@
+import AdminPanel from "./pages/AdminPanel";
+import ProfileSettings from "./pages/ProfileSettings";
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { User } from '@/types';
@@ -55,6 +57,20 @@ function App() {
                 : <RegisterScreen onLogin={handleLogin} />
             } 
           />
+          <Route
+            path="/profile"
+            element={
+              <ProfileSettings
+                user={currentUser}
+                setUser={setCurrentUser}  />
+            }
+          />
+          <Route
+            path="/admin"
+            element={<AdminPanel user={currentUser} />}
+          />
+
+
           
           {/* Protected routes - placeholder for now */}
           <Route 
