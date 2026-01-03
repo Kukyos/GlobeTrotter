@@ -65,7 +65,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, trips }) => {
           {FEATURED_DESTINATIONS.map((dest, i) => (
             <div 
               key={i} 
-              className="group relative aspect-[3/4] rounded-3xl overflow-hidden border border-white/10 hover:border-white/40 transition-all cursor-pointer"
+              className="group relative aspect-[3/4] rounded-3xl overflow-hidden border border-white/10 hover:border-white/40 transition-all cursor-pointer hover-lift animate-fade-in-up"
+              style={{ animationDelay: `${i * 100}ms` }}
               onClick={() => console.log(`Clicked ${dest.name} - Member C to handle`)}
             >
               <img 
@@ -88,9 +89,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, trips }) => {
         <h3 className="text-4xl font-bold font-heading">Your Collections</h3>
         {recentTrips.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {recentTrips.map(trip => (
-              <Link key={trip.id} to={`/itinerary/${trip.id}`} className="block group">
-                <div className="h-[500px] rounded-[2.5rem] overflow-hidden border border-white/10 glass flex flex-col hover:border-white/40 transition-all relative">
+            {recentTrips.map((trip, i) => (
+              <Link 
+                key={trip.id} 
+                to={`/itinerary/${trip.id}`} 
+                className="block group animate-scale-in"
+                style={{ animationDelay: `${i * 150}ms` }}
+              >
+                <div className="h-[500px] rounded-[2.5rem] overflow-hidden border border-white/10 glass flex flex-col hover:border-white/40 transition-all relative hover-lift">
                   <div className="absolute top-6 right-6 z-20">
                     <span className="bg-white/10 backdrop-blur-md text-[10px] px-3 py-1 rounded-full border border-white/20 font-bold uppercase tracking-widest">
                       {trip.status}

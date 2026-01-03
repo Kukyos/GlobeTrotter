@@ -1,9 +1,13 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { User, Trip } from '@/types';
-import { LoginScreen, RegisterScreen, CreateTrip, MyTrips } from '@/pages';
+import { LoginScreen, RegisterScreen, CreateTrip, MyTrips, ItineraryBuilder, ItineraryView } from '@/pages';
 import Navigation from '@/components/Navigation';
 import Dashboard from '@/components/Dashboard';
+import TravelChatbot from '@/components/TravelChatbot';
+import { supabase } from '@/lib/supabase';
+import { getCurrentUser, signOut, getTrips } from '@/services/supabaseService';
 
 /**
  * App Component
@@ -11,38 +15,325 @@ import Dashboard from '@/components/Dashboard';
  * Main application entry point with routing.
  * Handles authentication state and route protection.
  */
-function App() {
-  // Authentication state - persisted in localStorage
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('globetrotter_user');
-    return saved ? JSON.parse(saved) : null;
-  });
 
-  // Trips state - mock data for now, will be fetched from API
+// Page transition animation variants
+const pageVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -20 }
+};
+
+const pageTransition = {
+  duration: 0.3,
+  ease: "easeInOut"
+};
+
+// Animated Routes wrapper component
+function AnimatedRoutes({ 
+  currentUser, 
+  trips, 
+  setTrips, 
+  handleLogin, 
+  handleLogout 
+}: { 
+  currentUser: User | null;
+  trips: Trip[];
+  setTrips: React.Dispatch<React.SetStateAction<Trip[]>>;
+  handleLogin: (user: User) => void;
+  handleLogout: () => void;
+}) {
+  const location = useLocation();
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        {/* Public routes */}
+        <Route 
+          path="/" 
+          element={
+            currentUser 
+              ? <Navigate to="/dashboard" replace /> 
+              : (
+                <motion.div
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  variants={pageVariants}
+                  transition={pageTransition}
+                >
+                  <LoginScreen onLogin={handleLogin} />
+                </motion.div>
+              )
+          } 
+        />
+        <Route 
+          path="/register" 
+          element={
+            currentUser 
+              ? <Navigate to="/dashboard" replace /> 
+              : (
+                <motion.div
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  variants={pageVariants}
+                  transition={pageTransition}
+                >
+                  <RegisterScreen onLogin={handleLogin} />
+                </motion.div>
+              )
+          } 
+        />
+        
+        {/* Protected routes */}
+        <Route 
+          path="/dashboard" 
+          element={
+            currentUser ? (
+              <motion.div 
+                className="max-w-7xl mx-auto px-6 py-24"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                variants={pageVariants}
+                transition={pageTransition}
+              >
+                <Dashboard user={currentUser} trips={trips} />
+              </motion.div>
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
+        
+        <Route 
+          path="/create-trip" 
+          element={
+            currentUser ? (
+              <motion.div 
+                className="max-w-7xl mx-auto px-6 py-24"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                variants={pageVariants}
+                transition={pageTransition}
+              >
+                <CreateTrip userId={currentUser.id} />
+              </motion.div>
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
+        
+        <Route 
+          path="/my-trips" 
+          element={
+            currentUser ? (
+              <motion.div 
+                className="max-w-7xl mx-auto px-6 py-24"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                variants={pageVariants}
+                transition={pageTransition}
+              >
+                <MyTrips trips={trips} setTrips={setTrips} />
+              </motion.div>
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
+        
+        <Route 
+          path="/itinerary/:tripId" 
+          element={
+            currentUser ? (
+              <motion.div 
+                className="max-w-7xl mx-auto px-6 py-24"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                variants={pageVariants}
+                transition={pageTransition}
+              >
+                <ItineraryView tripId="" />
+              </motion.div>
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
+        
+        <Route 
+          path="/itinerary/:tripId/builder" 
+          element={
+            currentUser ? (
+              <motion.div 
+                className="max-w-7xl mx-auto px-6 py-24"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                variants={pageVariants}
+                transition={pageTransition}
+              >
+                <ItineraryBuilder tripId="" />
+              </motion.div>
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
+        
+        {/* Catch all - redirect to home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AnimatePresence>
+  );
+}
+
+// Timeout helper for async operations
+const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))
+  ]);
+};
+
+const AUTH_TIMEOUT = 5000; // 5 seconds
+const TRIPS_TIMEOUT = 8000; // 8 seconds
+
+function App() {
+  // Authentication state
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+
+  // Trips state
   const [trips, setTrips] = useState<Trip[]>([]);
 
-  // Persist user to localStorage
+  // Check for existing session on mount with timeout
   useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('globetrotter_user', JSON.stringify(currentUser));
-      // TODO: Fetch user's trips from API
-      // For now, using empty array
-      setTrips([]);
-    } else {
-      localStorage.removeItem('globetrotter_user');
-      setTrips([]);
-    }
-  }, [currentUser]);
+    let isMounted = true;
+    
+    const checkSession = async () => {
+      setIsLoading(true);
+      setLoadingError(null);
+      
+      try {
+        // Get user with timeout
+        const user = await withTimeout(
+          getCurrentUser(),
+          AUTH_TIMEOUT,
+          null
+        );
+        
+        if (!isMounted) return;
+        
+        if (user) {
+          setCurrentUser(user);
+          // Fetch trips with timeout - don't block on this
+          withTimeout(
+            getTrips(),
+            TRIPS_TIMEOUT,
+            { trips: [], error: 'Timeout loading trips' }
+          ).then(({ trips: userTrips }) => {
+            if (isMounted) setTrips(userTrips as any);
+          });
+        }
+      } catch (err) {
+        console.error('Session check failed:', err);
+        if (isMounted) setLoadingError('Connection issue. Please refresh.');
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    // Fallback timeout - ensure we never load forever
+    const fallbackTimer = setTimeout(() => {
+      if (isMounted && isLoading) {
+        setIsLoading(false);
+        setLoadingError('Loading took too long. Please refresh.');
+      }
+    }, AUTH_TIMEOUT + 2000);
+
+    checkSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const user = await withTimeout(getCurrentUser(), AUTH_TIMEOUT, null);
+        if (user && isMounted) {
+          setCurrentUser(user);
+          const { trips: userTrips } = await withTimeout(
+            getTrips(),
+            TRIPS_TIMEOUT,
+            { trips: [], error: null }
+          );
+          if (isMounted) setTrips(userTrips as any);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        if (isMounted) {
+          setCurrentUser(null);
+          setTrips([]);
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      clearTimeout(fallbackTimer);
+      subscription.unsubscribe();
+    };
+  }, []);
 
   // Auth handlers
   const handleLogin = (user: User) => {
     setCurrentUser(user);
+    // Fetch trips after login
+    getTrips().then(({ trips: userTrips }) => setTrips(userTrips as any));
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut();
     setCurrentUser(null);
-    localStorage.removeItem('token');
+    setTrips([]);
   };
+
+  // Show loading state with timeout fallback
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white/50">Loading...</p>
+          <p className="text-white/30 text-sm mt-2">This should only take a moment</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state with retry option
+  if (loadingError) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-6">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">⚠️</span>
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Connection Issue</h2>
+          <p className="text-white/50 mb-6">{loadingError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-white text-black rounded-full font-medium hover:bg-white/90 transition-colors"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Router>
@@ -50,68 +341,16 @@ function App() {
         {/* Navigation - shows on all authenticated pages */}
         {currentUser && <Navigation user={currentUser} onLogout={handleLogout} />}
         
-        <Routes>
-          {/* Public routes */}
-          <Route 
-            path="/" 
-            element={
-              currentUser 
-                ? <Navigate to="/dashboard" replace /> 
-                : <LoginScreen onLogin={handleLogin} />
-            } 
-          />
-          <Route 
-            path="/register" 
-            element={
-              currentUser 
-                ? <Navigate to="/dashboard" replace /> 
-                : <RegisterScreen onLogin={handleLogin} />
-            } 
-          />
-          
-          {/* Protected routes */}
-          <Route 
-            path="/dashboard" 
-            element={
-              currentUser ? (
-                <div className="max-w-7xl mx-auto px-6 py-24">
-                  <Dashboard user={currentUser} trips={trips} />
-                </div>
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } 
-          />
-          
-          <Route 
-            path="/create-trip" 
-            element={
-              currentUser ? (
-                <div className="max-w-7xl mx-auto px-6 py-24">
-                  <CreateTrip userId={currentUser.id} />
-                </div>
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } 
-          />
-          
-          <Route 
-            path="/my-trips" 
-            element={
-              currentUser ? (
-                <div className="max-w-7xl mx-auto px-6 py-24">
-                  <MyTrips trips={trips} setTrips={setTrips} />
-                </div>
-              ) : (
-                <Navigate to="/" replace />
-              )
-            } 
-          />
-          
-          {/* Catch all - redirect to home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <AnimatedRoutes 
+          currentUser={currentUser}
+          trips={trips}
+          setTrips={setTrips}
+          handleLogin={handleLogin}
+          handleLogout={handleLogout}
+        />
+
+        {/* Chatbot - only shows when logged in */}
+        {currentUser && <TravelChatbot />}
       </div>
     </Router>
   );
