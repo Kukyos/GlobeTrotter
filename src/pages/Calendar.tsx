@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import {
   addDays,
   addMonths,
@@ -14,7 +14,8 @@ import {
   startOfWeek,
   subMonths,
 } from "date-fns";
-import type { Trip } from "../types/trip";
+import { Trip } from "../types";
+import { getTrips } from "../services/supabaseService";
 
 /**
  * Calendar.tsx
@@ -24,69 +25,18 @@ import type { Trip } from "../types/trip";
  * - Custom calendar grid built with date-fns
  * - Shows trips spanning multiple days
  * - Click a day to view trips for that date
- * - Highlights today with `border-globe-500`
- *
- * Notes:
- * - Mock API used to fetch sample trips
- * - Uses Tailwind classes as requested
+ * - Highlights today
  */
-
-/* ---------------- Mock API (simulated) ---------------- */
-const mockGetTrips = (): Promise<Trip[]> =>
-  new Promise((resolve) => {
-    setTimeout(() => {
-      const now = new Date();
-      const iso = (d: Date) => format(d, "yyyy-MM-dd");
-      const sample: Trip[] = [
-        {
-          id: "t1",
-          userId: "member-b",
-          name: "Lisbon Weekend",
-          destination: "Lisbon, Portugal",
-          startDate: iso(addDays(now, -2)),
-          endDate: iso(addDays(now, 1)),
-          description: "Short city trip",
-          coverPhoto: undefined,
-          totalBudget: 800,
-          status: "ongoing",
-          stops: [],
-        },
-        {
-          id: "t2",
-          userId: "member-b",
-          name: "Paris in Spring",
-          destination: "Paris, France",
-          startDate: iso(addDays(now, 10)),
-          endDate: iso(addDays(now, 15)),
-          description: "Museums and cafes.",
-          coverPhoto: undefined,
-          totalBudget: 2200,
-          status: "upcoming",
-          stops: [],
-        },
-        {
-          id: "t3",
-          userId: "member-b",
-          name: "Roadtrip Spain",
-          destination: "Seville to Barcelona",
-          startDate: iso(addDays(now, 5)),
-          endDate: iso(addDays(now, 12)),
-          description: "Drive along the coast",
-          coverPhoto: undefined,
-          totalBudget: 1500,
-          status: "upcoming",
-          stops: [],
-        },
-      ];
-      resolve(sample);
-    }, 350);
-  });
 
 /* ---------------- Types ---------------- */
 interface CalendarDay {
   date: Date;
   isCurrentMonth: boolean;
   isToday: boolean;
+}
+
+interface CalendarProps {
+  trips?: Trip[];
 }
 
 /* ---------------- Helpers ---------------- */
@@ -162,19 +112,41 @@ const CalendarDayCell: React.FC<CalendarDayProps> = ({ date, isCurrentMonth, isT
 };
 
 /* ---------------- Main Calendar Component ---------------- */
-const Calendar: React.FC = () => {
-  const [trips, setTrips] = useState<Trip[]>([]);
+const Calendar: React.FC<CalendarProps> = ({ trips: propTrips }) => {
+  const [trips, setTrips] = useState<Trip[]>(propTrips || []);
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(!propTrips);
 
   useEffect(() => {
+    // If trips passed as props, use those
+    if (propTrips) {
+      setTrips(propTrips);
+      setIsLoading(false);
+      return;
+    }
+
+    // Otherwise fetch from Supabase
     let mounted = true;
     setIsLoading(true);
-    mockGetTrips().then((res) => {
+    getTrips().then(({ trips: userTrips, error }) => {
       if (!mounted) return;
-      setTrips(res);
+      if (!error && userTrips) {
+        // Map Supabase trip format to component format
+        setTrips(userTrips.map((t: any) => ({
+          id: t.id,
+          userId: t.user_id,
+          name: t.name,
+          destination: t.destination,
+          startDate: t.start_date,
+          endDate: t.end_date,
+          description: t.description,
+          coverPhoto: t.cover_photo,
+          totalBudget: t.total_budget,
+          status: t.status,
+        })));
+      }
       setIsLoading(false);
     });
     return () => {

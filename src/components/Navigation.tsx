@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { User } from '../types';
-import { Search, X, LogOut } from 'lucide-react';
+import { Search, X, LogOut, MapPin, Loader2, Calendar, UserCircle } from 'lucide-react';
+import { autocompletePlaces, isPlacesApiConfigured } from '../services/placesService';
 import { searchCities } from '../services/supabaseService';
 
 interface NavigationProps {
@@ -11,9 +12,11 @@ interface NavigationProps {
 
 const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchActive, setSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('All');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -29,12 +32,26 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
     setSearchResults([]);
   };
 
-  // Handle search
+  // Handle search with Places API or Supabase fallback
   useEffect(() => {
     const searchDebounce = setTimeout(async () => {
       if (searchQuery.trim().length > 1) {
-        const { cities } = await searchCities(searchQuery);
-        setSearchResults(cities);
+        setIsSearching(true);
+        try {
+          // Try Places API first, falls back to Supabase automatically
+          const { suggestions } = await autocompletePlaces(searchQuery, { types: ['cities'] });
+          setSearchResults(suggestions.map(s => ({
+            id: s.placeId,
+            name: s.mainText,
+            country: s.secondaryText,
+            description: s.description
+          })));
+        } catch (err) {
+          // Fallback to direct Supabase search
+          const { cities } = await searchCities(searchQuery);
+          setSearchResults(cities);
+        }
+        setIsSearching(false);
       } else {
         setSearchResults([]);
       }
@@ -115,6 +132,17 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
             >
               Trips
             </Link>
+            <Link 
+              to="/calendar" 
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
+                location.pathname === '/calendar'
+                  ? 'bg-white/10 text-white' 
+                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              <span className="hidden sm:inline">Calendar</span>
+            </Link>
           </div>
 
           {/* Divider */}
@@ -140,9 +168,29 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
 
           {/* User Menu */}
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white">
-              {user.name?.charAt(0).toUpperCase() || 'U'}
-            </div>
+            <Link 
+              to="/profile"
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                location.pathname === '/profile'
+                  ? 'bg-white text-black ring-2 ring-white/50'
+                  : 'bg-gradient-to-br from-blue-500 to-purple-600 text-white hover:scale-105'
+              }`}
+              title="Profile settings"
+            >
+              {user.name?.charAt(0).toUpperCase() || user.photoUrl || user.avatar ? (
+                user.photoUrl || user.avatar ? (
+                  <img 
+                    src={user.photoUrl || user.avatar} 
+                    alt={user.name} 
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  user.name?.charAt(0).toUpperCase() || 'U'
+                )
+              ) : (
+                <UserCircle className="w-5 h-5" />
+              )}
+            </Link>
             <button
               onClick={onLogout}
               className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-all"
@@ -182,7 +230,7 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
 
             {/* Filters */}
             <div className="px-4 py-3 flex gap-2 border-b border-white/10 overflow-x-auto">
-              {['All', 'Cities', 'Trips'].map((filter) => (
+              {['All', 'Cities', 'Attractions'].map((filter) => (
                 <button
                   key={filter}
                   onClick={() => setSelectedFilter(filter)}
@@ -195,45 +243,51 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
                   {filter}
                 </button>
               ))}
+              {!isPlacesApiConfigured() && (
+                <span className="px-3 py-1.5 text-xs text-white/30">
+                  (Using cached cities)
+                </span>
+              )}
             </div>
 
             {/* Results */}
             <div className="max-h-80 overflow-y-auto">
-              {searchQuery.length > 1 ? (
+              {isSearching ? (
+                <div className="p-8 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 text-white/50 animate-spin" />
+                </div>
+              ) : searchQuery.length > 1 ? (
                 searchResults.length > 0 ? (
                   <div className="p-2">
-                    {searchResults.map((city) => (
-                      <Link
-                        key={city.id}
-                        to={`/create-trip?city=${encodeURIComponent(city.name)}`}
-                        onClick={deactivateSearch}
-                        className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-all group"
+                    {searchResults.map((result) => (
+                      <button
+                        key={result.id}
+                        onClick={() => {
+                          navigate(`/create-trip?destination=${encodeURIComponent(result.name || result.description)}`);
+                          deactivateSearch();
+                        }}
+                        className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-all group text-left"
                       >
-                        {city.image_url ? (
+                        {result.image_url ? (
                           <img 
-                            src={city.image_url} 
-                            alt={city.name}
+                            src={result.image_url} 
+                            alt={result.name}
                             className="w-12 h-12 rounded-lg object-cover"
                           />
                         ) : (
                           <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center">
-                            <span className="text-lg">🌍</span>
+                            <MapPin className="w-5 h-5 text-white/50" />
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-white group-hover:text-white/90">
-                            {city.name}
+                            {result.name}
                           </h4>
-                          <p className="text-sm text-white/50">
-                            {city.country} • {city.continent}
+                          <p className="text-sm text-white/50 truncate">
+                            {result.country || result.description}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <div className="text-xs text-white/40">
-                            {'$'.repeat(city.cost_index)}
-                          </div>
-                        </div>
-                      </Link>
+                      </button>
                     ))}
                   </div>
                 ) : (

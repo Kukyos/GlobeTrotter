@@ -7,27 +7,26 @@
 /**
  * User roles for access control
  */
-export enum UserRole {
-  USER = 'user',
-  ADMIN = 'admin',
-}
+export type UserRole = 'user' | 'admin' | 'guide';
 
 /**
  * User account information
- * Maps to: users table in database
+ * Maps to: profiles table in Supabase
  */
 export interface User {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  name?: string;  // Display name (can be derived from firstName + lastName)
+  firstName?: string;
+  lastName?: string;
   phone?: string;
   photoUrl?: string;
+  avatar?: string;  // Alias for photoUrl
   city?: string;
   country?: string;
   bio?: string;
   role: UserRole;
-  createdAt: string;
+  createdAt?: string;
   updatedAt?: string;
 }
 

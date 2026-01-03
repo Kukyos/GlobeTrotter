@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Trip } from '@/types';
-import { LoginScreen, RegisterScreen, CreateTrip, MyTrips, ItineraryBuilder, ItineraryView } from '@/pages';
+import { LoginScreen, RegisterScreen, CreateTrip, MyTrips, ItineraryBuilder, ItineraryView, Calendar, ProfileSettings } from '@/pages';
 import Navigation from '@/components/Navigation';
 import Dashboard from '@/components/Dashboard';
 import TravelChatbot from '@/components/TravelChatbot';
@@ -33,12 +33,14 @@ function AnimatedRoutes({
   currentUser, 
   trips, 
   setTrips, 
+  setUser,
   handleLogin, 
   handleLogout 
 }: { 
   currentUser: User | null;
   trips: Trip[];
   setTrips: React.Dispatch<React.SetStateAction<Trip[]>>;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
   handleLogin: (user: User) => void;
   handleLogout: () => void;
 }) {
@@ -185,6 +187,46 @@ function AnimatedRoutes({
             )
           } 
         />
+
+        <Route 
+          path="/calendar" 
+          element={
+            currentUser ? (
+              <motion.div 
+                className="max-w-7xl mx-auto px-6 py-24"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                variants={pageVariants}
+                transition={pageTransition}
+              >
+                <Calendar trips={trips} />
+              </motion.div>
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
+
+        <Route 
+          path="/profile" 
+          element={
+            currentUser ? (
+              <motion.div 
+                className="max-w-7xl mx-auto px-6 py-24"
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                variants={pageVariants}
+                transition={pageTransition}
+              >
+                <ProfileSettings user={currentUser} setUser={setUser} />
+              </motion.div>
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
         
         {/* Catch all - redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -201,14 +243,13 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<
   ]);
 };
 
-const AUTH_TIMEOUT = 5000; // 5 seconds
-const TRIPS_TIMEOUT = 8000; // 8 seconds
+const AUTH_TIMEOUT = 8000; // 8 seconds
+const TRIPS_TIMEOUT = 10000; // 10 seconds
 
 function App() {
   // Authentication state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingError, setLoadingError] = useState<string | null>(null);
 
   // Trips state
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -216,11 +257,9 @@ function App() {
   // Check for existing session on mount with timeout
   useEffect(() => {
     let isMounted = true;
+    let sessionCheckComplete = false;
     
     const checkSession = async () => {
-      setIsLoading(true);
-      setLoadingError(null);
-      
       try {
         // Get user with timeout
         const user = await withTimeout(
@@ -230,6 +269,7 @@ function App() {
         );
         
         if (!isMounted) return;
+        sessionCheckComplete = true;
         
         if (user) {
           setCurrentUser(user);
@@ -242,21 +282,24 @@ function App() {
             if (isMounted) setTrips(userTrips as any);
           });
         }
+        
+        setIsLoading(false);
       } catch (err) {
         console.error('Session check failed:', err);
-        if (isMounted) setLoadingError('Connection issue. Please refresh.');
-      } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) {
+          sessionCheckComplete = true;
+          setIsLoading(false);
+        }
       }
     };
 
-    // Fallback timeout - ensure we never load forever
+    // Fallback timeout - ensure we never load forever (only if check hasn't completed)
     const fallbackTimer = setTimeout(() => {
-      if (isMounted && isLoading) {
+      if (isMounted && !sessionCheckComplete) {
+        console.log('Fallback timeout triggered - session check incomplete');
         setIsLoading(false);
-        setLoadingError('Loading took too long. Please refresh.');
       }
-    }, AUTH_TIMEOUT + 2000);
+    }, AUTH_TIMEOUT + 3000);
 
     checkSession();
 
@@ -301,7 +344,7 @@ function App() {
     setTrips([]);
   };
 
-  // Show loading state with timeout fallback
+  // Show loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -309,27 +352,6 @@ function App() {
           <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4" />
           <p className="text-white/50">Loading...</p>
           <p className="text-white/30 text-sm mt-2">This should only take a moment</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state with retry option
-  if (loadingError) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto px-6">
-          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
-            <span className="text-3xl">⚠️</span>
-          </div>
-          <h2 className="text-xl font-semibold mb-2">Connection Issue</h2>
-          <p className="text-white/50 mb-6">{loadingError}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-white text-black rounded-full font-medium hover:bg-white/90 transition-colors"
-          >
-            Refresh Page
-          </button>
         </div>
       </div>
     );
@@ -345,6 +367,7 @@ function App() {
           currentUser={currentUser}
           trips={trips}
           setTrips={setTrips}
+          setUser={setCurrentUser}
           handleLogin={handleLogin}
           handleLogout={handleLogout}
         />

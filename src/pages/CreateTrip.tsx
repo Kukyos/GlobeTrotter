@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Sparkles, Plus, X } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { MapPin, Calendar, Sparkles, Plus, X, AlertCircle, Loader2 } from 'lucide-react';
 import { Trip } from '@/types';
-import api from '@/services/api';
+import { autocompletePlaces, isPlacesApiConfigured } from '@/services/placesService';
+import { searchCities, createTrip } from '@/services/supabaseService';
 
 interface CreateTripProps {
   userId: string;
@@ -17,24 +18,41 @@ interface CitySearchResult {
 
 const CreateTrip: React.FC<CreateTripProps> = ({ userId }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     name: '',
     startDate: '',
     endDate: '',
     description: '',
-    destination: ''
+    destination: searchParams.get('destination') || ''
   });
   
   const [citySuggestions, setCitySuggestions] = useState<CitySearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedCity, setSelectedCity] = useState<CitySearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // If destination came from URL, auto-select it
+  useEffect(() => {
+    const dest = searchParams.get('destination');
+    if (dest) {
+      setSelectedCity({
+        placeId: 'url-param',
+        name: dest,
+        country: '',
+        description: dest
+      });
+    }
+  }, [searchParams]);
 
   // Handle destination search with debounce
   const handleDestinationSearch = async (value: string) => {
     setFormData(prev => ({ ...prev, destination: value }));
+    setSearchError(null);
     
     if (value.length < 2) {
       setCitySuggestions([]);
@@ -50,30 +68,53 @@ const CreateTrip: React.FC<CreateTripProps> = ({ userId }) => {
     // Debounce search
     searchTimeout.current = setTimeout(async () => {
       setIsSearching(true);
+      setSearchError(null);
+      
       try {
-        // Call the autocomplete API
-        const response = await api.get(`/cities/autocomplete?query=${encodeURIComponent(value)}`);
-        if (response.data.success) {
-          setCitySuggestions(response.data.data);
+        // Try Places API autocomplete first
+        const { suggestions, error } = await autocompletePlaces(value, { types: ['cities'] });
+        
+        if (suggestions.length > 0) {
+          setCitySuggestions(suggestions.map(s => ({
+            placeId: s.placeId,
+            name: s.mainText,
+            country: s.secondaryText,
+            description: s.description
+          })));
           setShowSuggestions(true);
-        }
-      } catch (error) {
-        console.error('Error searching cities:', error);
-        // Fallback to local database search
-        try {
-          const fallbackResponse = await api.get(`/cities/search?query=${encodeURIComponent(value)}`);
-          if (fallbackResponse.data.success) {
-            const cities = fallbackResponse.data.data.map((city: any) => ({
+        } else {
+          // Fallback to Supabase cities
+          const { cities, error: dbError } = await searchCities(value);
+          if (cities.length > 0) {
+            setCitySuggestions(cities.map((city: any) => ({
               placeId: city.id,
               name: city.name,
               country: city.country,
               description: `${city.name}, ${city.country}`
-            }));
-            setCitySuggestions(cities);
+            })));
             setShowSuggestions(true);
+          } else if (!isPlacesApiConfigured()) {
+            setSearchError('No cities found. Try a different search term.');
+          }
+        }
+      } catch (error: any) {
+        console.error('Search error:', error);
+        // Try Supabase fallback
+        try {
+          const { cities } = await searchCities(value);
+          if (cities.length > 0) {
+            setCitySuggestions(cities.map((city: any) => ({
+              placeId: city.id,
+              name: city.name,
+              country: city.country,
+              description: `${city.name}, ${city.country}`
+            })));
+            setShowSuggestions(true);
+          } else {
+            setSearchError('No results found. Try searching for major cities.');
           }
         } catch (fallbackError) {
-          console.error('Fallback search also failed:', fallbackError);
+          setSearchError('Search unavailable. Please try again later.');
         }
       } finally {
         setIsSearching(false);
@@ -101,34 +142,45 @@ const CreateTrip: React.FC<CreateTripProps> = ({ userId }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
     
     if (!selectedCity) {
-      alert('Please select a destination from the suggestions');
+      setSubmitError('Please select a destination from the suggestions');
+      return;
+    }
+
+    if (!formData.startDate || !formData.endDate) {
+      setSubmitError('Please select travel dates');
       return;
     }
 
     setLoading(true);
     try {
-      // Create the trip via API
-      const tripData = {
+      // Create the trip via Supabase
+      const { trip, error } = await createTrip({
+        user_id: userId,
         name: formData.name || `Trip to ${selectedCity.name}`,
-        description: formData.description,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
+        description: formData.description || null,
+        start_date: formData.startDate,
+        end_date: formData.endDate,
         destination: selectedCity.description,
-        cityId: selectedCity.placeId
-      };
+        cover_photo: null,
+        total_budget: 0,
+        status: 'draft',
+        is_public: false
+      });
 
-      const response = await api.post('/trips', tripData);
+      if (error) {
+        throw new Error(error);
+      }
       
-      if (response.data.success) {
-        const newTrip = response.data.data;
+      if (trip) {
         // Navigate to itinerary builder
-        navigate(`/itinerary/${newTrip.id}`);
+        navigate(`/itinerary/${trip.id}`);
       }
     } catch (error: any) {
       console.error('Error creating trip:', error);
-      alert(error.response?.data?.message || 'Failed to create trip. Please try again.');
+      setSubmitError(error.message || 'Failed to create trip. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -145,6 +197,21 @@ const CreateTrip: React.FC<CreateTripProps> = ({ userId }) => {
           Start your adventure by setting up the basics
         </p>
       </div>
+
+      {/* Submit Error Alert */}
+      {submitError && (
+        <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <p className="text-sm">{submitError}</p>
+          <button 
+            type="button"
+            onClick={() => setSubmitError(null)}
+            className="ml-auto text-red-400/50 hover:text-red-400 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Trip Form */}
       <form onSubmit={handleSubmit} className="card space-y-8">
@@ -170,6 +237,9 @@ const CreateTrip: React.FC<CreateTripProps> = ({ userId }) => {
           <label className="input-label flex items-center gap-2">
             <MapPin className="w-4 h-4" />
             Select a Place
+            {!isPlacesApiConfigured() && (
+              <span className="text-xs text-yellow-500/70 font-normal">(Limited to cached cities)</span>
+            )}
           </label>
           <div className="relative">
             <div className="relative">
@@ -181,10 +251,13 @@ const CreateTrip: React.FC<CreateTripProps> = ({ userId }) => {
                 value={formData.destination}
                 onChange={(e) => handleDestinationSearch(e.target.value)}
                 onFocus={() => citySuggestions.length > 0 && setShowSuggestions(true)}
-                className="input-field pl-12 pr-10"
+                className={`input-field pl-12 pr-10 ${selectedCity ? 'border-green-500/50' : ''}`}
                 autoComplete="off"
               />
-              {selectedCity && (
+              {isSearching && (
+                <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50 animate-spin" />
+              )}
+              {selectedCity && !isSearching && (
                 <button
                   type="button"
                   onClick={clearCity}
@@ -194,6 +267,22 @@ const CreateTrip: React.FC<CreateTripProps> = ({ userId }) => {
                 </button>
               )}
             </div>
+            
+            {/* Search Error */}
+            {searchError && (
+              <div className="mt-2 flex items-center gap-2 text-yellow-500/80 text-sm">
+                <AlertCircle className="w-4 h-4" />
+                <span>{searchError}</span>
+              </div>
+            )}
+
+            {/* Selected City Indicator */}
+            {selectedCity && (
+              <div className="mt-2 flex items-center gap-2 text-green-500/80 text-sm">
+                <MapPin className="w-4 h-4" />
+                <span>Selected: {selectedCity.description}</span>
+              </div>
+            )}
 
             {/* Dropdown suggestions */}
             {showSuggestions && citySuggestions.length > 0 && (

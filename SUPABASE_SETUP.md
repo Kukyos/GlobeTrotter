@@ -15,8 +15,8 @@
 
 1. Go to **Settings** → **API** in your Supabase dashboard
 2. Copy these values:
-   - **Project URL**: `https://xxxxx.supabase.co`
-   - **anon/public key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+   - **Project URL**: `https://kpywgbvpngihshckqhwg.supabase.co`
+   - **anon/public key**: `sb_publishable_eegsNSrXg46dVjs15IGW7A_z3dxs-5w`
 
 ## Step 3: Run the SQL Schema
 
