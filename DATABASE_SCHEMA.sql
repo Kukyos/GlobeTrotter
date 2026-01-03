@@ -12,7 +12,7 @@ USE globetrotter;
 -- USERS TABLE
 -- Stores user account information
 -- =============================================
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(36) PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE users (
 -- CITIES TABLE (Reference/Lookup)
 -- Pre-populated city data for search/discovery
 -- =============================================
-CREATE TABLE cities (
+CREATE TABLE IF NOT EXISTS cities (
     id VARCHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     country VARCHAR(100) NOT NULL,
@@ -61,7 +61,7 @@ CREATE TABLE cities (
 -- TRIPS TABLE
 -- User-created trip plans
 -- =============================================
-CREATE TABLE trips (
+CREATE TABLE IF NOT EXISTS trips (
     id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
     name VARCHAR(255) NOT NULL,
@@ -90,7 +90,7 @@ CREATE TABLE trips (
 -- STOPS TABLE
 -- Cities/destinations within a trip
 -- =============================================
-CREATE TABLE stops (
+CREATE TABLE IF NOT EXISTS stops (
     id VARCHAR(36) PRIMARY KEY,
     trip_id VARCHAR(36) NOT NULL,
     city_id VARCHAR(36),
@@ -116,7 +116,7 @@ CREATE TABLE stops (
 -- ACTIVITIES TABLE
 -- Activities/events within a stop
 -- =============================================
-CREATE TABLE activities (
+CREATE TABLE IF NOT EXISTS activities (
     id VARCHAR(36) PRIMARY KEY,
     stop_id VARCHAR(36) NOT NULL,
     name VARCHAR(255) NOT NULL,
@@ -147,7 +147,7 @@ CREATE TABLE activities (
 -- ACTIVITY TEMPLATES TABLE
 -- Pre-defined activities for cities (suggestions)
 -- =============================================
-CREATE TABLE activity_templates (
+CREATE TABLE IF NOT EXISTS activity_templates (
     id VARCHAR(36) PRIMARY KEY,
     city_id VARCHAR(36) NOT NULL,
     name VARCHAR(255) NOT NULL,
@@ -178,7 +178,7 @@ CREATE TABLE activity_templates (
 -- COMMUNITY POSTS TABLE
 -- User-generated content/trip sharing
 -- =============================================
-CREATE TABLE community_posts (
+CREATE TABLE IF NOT EXISTS community_posts (
     id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
     trip_id VARCHAR(36),
@@ -206,7 +206,7 @@ CREATE TABLE community_posts (
 -- POST LIKES TABLE
 -- Tracks which users liked which posts
 -- =============================================
-CREATE TABLE post_likes (
+CREATE TABLE IF NOT EXISTS post_likes (
     post_id VARCHAR(36) NOT NULL,
     user_id VARCHAR(36) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -222,7 +222,7 @@ CREATE TABLE post_likes (
 -- POST COMMENTS TABLE
 -- Comments on community posts
 -- =============================================
-CREATE TABLE post_comments (
+CREATE TABLE IF NOT EXISTS post_comments (
     id VARCHAR(36) PRIMARY KEY,
     post_id VARCHAR(36) NOT NULL,
     user_id VARCHAR(36) NOT NULL,
@@ -244,7 +244,7 @@ CREATE TABLE post_comments (
 -- =============================================
 -- USER FOLLOWERS TABLE (Optional - for social features)
 -- =============================================
-CREATE TABLE user_followers (
+CREATE TABLE IF NOT EXISTS user_followers (
     follower_id VARCHAR(36) NOT NULL,
     following_id VARCHAR(36) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -260,7 +260,7 @@ CREATE TABLE user_followers (
 -- SAVED CITIES TABLE
 -- User's bookmarked/saved cities
 -- =============================================
-CREATE TABLE saved_cities (
+CREATE TABLE IF NOT EXISTS saved_cities (
     user_id VARCHAR(36) NOT NULL,
     city_id VARCHAR(36) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -275,7 +275,7 @@ CREATE TABLE saved_cities (
 -- =============================================
 -- SESSION TOKENS TABLE (for auth)
 -- =============================================
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
     id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
     token VARCHAR(255) UNIQUE NOT NULL,
@@ -294,8 +294,7 @@ CREATE TABLE sessions (
 -- =============================================
 
 -- Update trip status based on dates
-DELIMITER //
-CREATE TRIGGER update_trip_status_on_insert
+CREATE TRIGGER IF NOT EXISTS update_trip_status_on_insert
 BEFORE INSERT ON trips
 FOR EACH ROW
 BEGIN
@@ -306,60 +305,50 @@ BEGIN
     ELSE
         SET NEW.status = 'ongoing';
     END IF;
-END//
-DELIMITER ;
+END;
 
 -- Increment likes count
-DELIMITER //
-CREATE TRIGGER increment_likes_count
+CREATE TRIGGER IF NOT EXISTS increment_likes_count
 AFTER INSERT ON post_likes
 FOR EACH ROW
 BEGIN
     UPDATE community_posts 
     SET likes_count = likes_count + 1 
     WHERE id = NEW.post_id;
-END//
-DELIMITER ;
+END;
 
 -- Decrement likes count
-DELIMITER //
-CREATE TRIGGER decrement_likes_count
+CREATE TRIGGER IF NOT EXISTS decrement_likes_count
 AFTER DELETE ON post_likes
 FOR EACH ROW
 BEGIN
     UPDATE community_posts 
     SET likes_count = GREATEST(likes_count - 1, 0) 
     WHERE id = OLD.post_id;
-END//
-DELIMITER ;
+END;
 
 -- Increment comments count
-DELIMITER //
-CREATE TRIGGER increment_comments_count
+CREATE TRIGGER IF NOT EXISTS increment_comments_count
 AFTER INSERT ON post_comments
 FOR EACH ROW
 BEGIN
     UPDATE community_posts 
     SET comments_count = comments_count + 1 
     WHERE id = NEW.post_id;
-END//
-DELIMITER ;
+END;
 
 -- Decrement comments count
-DELIMITER //
-CREATE TRIGGER decrement_comments_count
+CREATE TRIGGER IF NOT EXISTS decrement_comments_count
 AFTER DELETE ON post_comments
 FOR EACH ROW
 BEGIN
     UPDATE community_posts 
     SET comments_count = GREATEST(comments_count - 1, 0) 
     WHERE id = OLD.post_id;
-END//
-DELIMITER ;
+END;
 
 -- Increment city popularity when added to trip
-DELIMITER //
-CREATE TRIGGER increment_city_popularity
+CREATE TRIGGER IF NOT EXISTS increment_city_popularity
 AFTER INSERT ON stops
 FOR EACH ROW
 BEGIN
@@ -368,8 +357,7 @@ BEGIN
         SET popularity = popularity + 1 
         WHERE id = NEW.city_id;
     END IF;
-END//
-DELIMITER ;
+END;
 
 -- =============================================
 -- SAMPLE DATA - Cities

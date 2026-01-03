@@ -8,11 +8,11 @@
 
 | # | Screen | Priority | Status |
 |---|--------|----------|--------|
-| 1 | Create Trip | HIGH | Pending |
-| 2 | My Trips (List) | HIGH | Pending |
-| 3 | Itinerary Builder | HIGH | Pending |
-| 4 | Itinerary View | MEDIUM | Pending |
-| 5 | Calendar/Timeline | MEDIUM | Pending |
+| 1 | Create Trip | HIGH | Done |
+| 2 | My Trips (List) | HIGH | Done |
+| 3 | Itinerary Builder | HIGH | Done |
+| 4 | Itinerary View | MEDIUM | Done |
+| 5 | Calendar/Timeline | MEDIUM | Done |
 
 ---
 
