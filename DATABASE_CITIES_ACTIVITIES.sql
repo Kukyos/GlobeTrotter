@@ -15,6 +15,17 @@
 -- ===========================================
 -- These are the featured destinations shown on the Dashboard
 
+-- First, add unique constraint if it doesn't exist (needed for ON CONFLICT)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'cities_name_country_unique'
+  ) THEN
+    ALTER TABLE cities ADD CONSTRAINT cities_name_country_unique UNIQUE (name, country);
+  END IF;
+END $$;
+
 INSERT INTO cities (name, country, continent, latitude, longitude, cost_index, popularity, image_url) VALUES
 -- EUROPE
 ('Paris', 'France', 'Europe', 48.8566, 2.3522, 4, 100, 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&q=80'),
@@ -120,8 +131,14 @@ CREATE TABLE IF NOT EXISTS activities (
 -- Enable RLS for activities
 ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist, then create new ones
+DROP POLICY IF EXISTS "Users can view their trip activities" ON activities;
+DROP POLICY IF EXISTS "Users can insert their trip activities" ON activities;
+DROP POLICY IF EXISTS "Users can update their trip activities" ON activities;
+DROP POLICY IF EXISTS "Users can delete their trip activities" ON activities;
+
 -- Activities policy: users can only access activities for their own trips
-CREATE POLICY IF NOT EXISTS "Users can view their trip activities" ON activities
+CREATE POLICY "Users can view their trip activities" ON activities
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM stops s
@@ -130,7 +147,7 @@ CREATE POLICY IF NOT EXISTS "Users can view their trip activities" ON activities
     )
   );
 
-CREATE POLICY IF NOT EXISTS "Users can insert their trip activities" ON activities
+CREATE POLICY "Users can insert their trip activities" ON activities
   FOR INSERT WITH CHECK (
     EXISTS (
       SELECT 1 FROM stops s
@@ -139,7 +156,7 @@ CREATE POLICY IF NOT EXISTS "Users can insert their trip activities" ON activiti
     )
   );
 
-CREATE POLICY IF NOT EXISTS "Users can update their trip activities" ON activities
+CREATE POLICY "Users can update their trip activities" ON activities
   FOR UPDATE USING (
     EXISTS (
       SELECT 1 FROM stops s
@@ -148,7 +165,7 @@ CREATE POLICY IF NOT EXISTS "Users can update their trip activities" ON activiti
     )
   );
 
-CREATE POLICY IF NOT EXISTS "Users can delete their trip activities" ON activities
+CREATE POLICY "Users can delete their trip activities" ON activities
   FOR DELETE USING (
     EXISTS (
       SELECT 1 FROM stops s
