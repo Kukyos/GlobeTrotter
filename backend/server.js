@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
+import tripsRoutes from './routes/trips.js';
+import citiesRoutes from './routes/cities.js';
 
 // Load environment variables
 dotenv.config();
@@ -25,6 +27,8 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/trips', tripsRoutes);
+app.use('/api/cities', citiesRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
