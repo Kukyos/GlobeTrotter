@@ -1,338 +1,321 @@
-import React, { useEffect, useRef, useState } from "react";
-import { MapPin, Calendar, DollarSign, Check, X } from "lucide-react";
-import { formatISO } from "date-fns";
-import type { City, Trip } from "../types/trip";
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { MapPin, Calendar, Sparkles, Plus, X } from 'lucide-react';
+import { Trip } from '@/types';
+import api from '@/services/api';
 
-/**
- * CreateTrip.tsx
- *
- * Screen: Create Trip
- *
- * Requirements implemented:
- * - Form to initiate a new trip
- * - Exact header class: "text-3xl font-display font-bold glow-text"
- * - Inputs use classes "input-label" for labels and "input-field" for inputs
- * - State: tripName, destination, startDate, endDate, budget
- * - Destination input has a dropdown for citySuggestions
- * - "Suggestions" section grid that maps suggestions via SuggestionCard
- *
- * Notes:
- * - Mocked API calls use setTimeout to simulate latency.
- * - Functional components and strict TypeScript interfaces are used.
- */
-
-/* ---------- Mock API (kept simple and structured) ---------- */
-const mockFetchCitySuggestions = (query = ""): Promise<City[]> =>
-  new Promise((resolve) => {
-    setTimeout(() => {
-      const all: City[] = [
-        { id: "c1", name: "Lisbon", country: "Portugal", imageUrl: "https://images.unsplash.com/photo-1505238680356-667803448bb6?w=800&q=60" },
-        { id: "c2", name: "Paris", country: "France", imageUrl: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&q=60" },
-        { id: "c3", name: "Kyoto", country: "Japan", imageUrl: "https://images.unsplash.com/photo-1549693578-d683be217e58?w=800&q=60" },
-        { id: "c4", name: "New York", country: "USA", imageUrl: "https://images.unsplash.com/photo-1549924231-f129b911e442?w=800&q=60" },
-        { id: "c5", name: "Cape Town", country: "South Africa", imageUrl: "https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=800&q=60" },
-      ];
-
-      const filtered = query.trim()
-        ? all.filter((c) => c.name.toLowerCase().includes(query.trim().toLowerCase()))
-        : all;
-      resolve(filtered);
-    }, 450);
-  });
-
-/* ---------- SuggestionCard sub-component ---------- */
-interface SuggestionCardProps {
-  city: City;
-  onSelect: (city: City) => void;
+interface CreateTripProps {
+  userId: string;
 }
 
-const SuggestionCard: React.FC<SuggestionCardProps> = ({ city, onSelect }) => {
-  return (
-    <div
-      className="flex items-center space-x-3 rounded-lg border p-3 hover:shadow-md transition cursor-pointer"
-      onClick={() => onSelect(city)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") onSelect(city);
-      }}
-    >
-      <div className="h-14 w-20 flex-shrink-0 overflow-hidden rounded-md bg-gray-100">
-        {city.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={city.imageUrl} alt={`${city.name} cover`} className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm text-gray-500">No Image</div>
-        )}
-      </div>
+interface CitySearchResult {
+  placeId: string;
+  name: string;
+  country: string;
+  description: string;
+}
 
-      <div className="flex flex-1 flex-col">
-        <div className="text-sm font-semibold">{city.name}</div>
-        <div className="text-xs text-gray-500">{city.country}</div>
-      </div>
+const CreateTrip: React.FC<CreateTripProps> = ({ userId }) => {
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    name: '',
+    startDate: '',
+    endDate: '',
+    description: '',
+    destination: ''
+  });
+  
+  const [citySuggestions, setCitySuggestions] = useState<CitySearchResult[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedCity, setSelectedCity] = useState<CitySearchResult | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-      <div className="ml-2">
-        <Check className="h-5 w-5 text-green-500" />
-      </div>
-    </div>
-  );
-};
+  // Handle destination search with debounce
+  const handleDestinationSearch = async (value: string) => {
+    setFormData(prev => ({ ...prev, destination: value }));
+    
+    if (value.length < 2) {
+      setCitySuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
 
-/* ---------- Main CreateTrip Component ---------- */
-const CreateTrip: React.FC = () => {
-  const [tripName, setTripName] = useState<string>("");
-  const [destination, setDestination] = useState<string>("");
-  const [selectedCity, setSelectedCity] = useState<City | null>(null);
-  const [startDate, setStartDate] = useState<string>(() => formatISO(new Date(), { representation: "date" }));
-  const [endDate, setEndDate] = useState<string>(() => formatISO(new Date(), { representation: "date" }));
-  const [budget, setBudget] = useState<number | "">("");
-  const [citySuggestions, setCitySuggestions] = useState<City[]>([]);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState<boolean>(false);
-  const [showDropdown, setShowDropdown] = useState<boolean>(false);
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
+    // Clear previous timeout
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
 
-  useEffect(() => {
-    // initial load of suggestions
-    refreshSuggestions("");
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (ev: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(ev.target as Node)) {
-        setShowDropdown(false);
+    // Debounce search
+    searchTimeout.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        // Call the autocomplete API
+        const response = await api.get(`/cities/autocomplete?query=${encodeURIComponent(value)}`);
+        if (response.data.success) {
+          setCitySuggestions(response.data.data);
+          setShowSuggestions(true);
+        }
+      } catch (error) {
+        console.error('Error searching cities:', error);
+        // Fallback to local database search
+        try {
+          const fallbackResponse = await api.get(`/cities/search?query=${encodeURIComponent(value)}`);
+          if (fallbackResponse.data.success) {
+            const cities = fallbackResponse.data.data.map((city: any) => ({
+              placeId: city.id,
+              name: city.name,
+              country: city.country,
+              description: `${city.name}, ${city.country}`
+            }));
+            setCitySuggestions(cities);
+            setShowSuggestions(true);
+          }
+        } catch (fallbackError) {
+          console.error('Fallback search also failed:', fallbackError);
+        }
+      } finally {
+        setIsSearching(false);
       }
-    };
-    window.addEventListener("click", handleClickOutside);
-    return () => window.removeEventListener("click", handleClickOutside);
-  }, []);
-
-  const refreshSuggestions = (query: string) => {
-    setIsLoadingSuggestions(true);
-    mockFetchCitySuggestions(query)
-      .then((res) => {
-        setCitySuggestions(res);
-      })
-      .finally(() => setIsLoadingSuggestions(false));
+    }, 300);
   };
 
-  const handleDestinationChange = (val: string) => {
-    setDestination(val);
-    setSelectedCity(null);
-    setShowDropdown(true);
-    refreshSuggestions(val);
-  };
-
-  const handleSelectCity = (city: City) => {
+  // Select a city from suggestions
+  const selectCity = (city: CitySearchResult) => {
     setSelectedCity(city);
-    setDestination(`${city.name}, ${city.country}`);
-    setShowDropdown(false);
+    setFormData(prev => ({ ...prev, destination: city.description }));
+    setShowSuggestions(false);
+    setCitySuggestions([]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Clear selected city
+  const clearCity = () => {
+    setSelectedCity(null);
+    setFormData(prev => ({ ...prev, destination: '' }));
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // basic validation
-    if (!tripName.trim()) {
-      alert("Please enter a trip name.");
-      return;
-    }
-    if (!destination.trim()) {
-      alert("Please select a destination.");
+    
+    if (!selectedCity) {
+      alert('Please select a destination from the suggestions');
       return;
     }
 
-    const newTrip: Trip = {
-      id: `trip_${Date.now()}`,
-      userId: "member-b", // placeholder for Member B
-      name: tripName.trim(),
-      destination: destination.trim(),
-      startDate: startDate,
-      endDate: endDate,
-      description: undefined,
-      coverPhoto: selectedCity?.imageUrl,
-      totalBudget: typeof budget === "number" ? budget : undefined,
-      status: "upcoming",
-      stops: [],
-    };
+    setLoading(true);
+    try {
+      // Create the trip via API
+      const tripData = {
+        name: formData.name || `Trip to ${selectedCity.name}`,
+        description: formData.description,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        destination: selectedCity.description,
+        cityId: selectedCity.placeId
+      };
 
-    // mock API call to create trip
-    setTimeout(() => {
-      // In a real app we'd POST newTrip to an endpoint
-      // For now, we just log it and reset the form
-      // eslint-disable-next-line no-console
-      console.log("Created trip (mock):", newTrip);
-      alert("Trip created (mock). Check console for object.");
-      // reset
-      setTripName("");
-      setDestination("");
-      setSelectedCity(null);
-      setStartDate(formatISO(new Date(), { representation: "date" }));
-      setEndDate(formatISO(new Date(), { representation: "date" }));
-      setBudget("");
-    }, 700);
+      const response = await api.post('/trips', tripData);
+      
+      if (response.data.success) {
+        const newTrip = response.data.data;
+        // Navigate to itinerary builder
+        navigate(`/itinerary/${newTrip.id}`);
+      }
+    } catch (error: any) {
+      console.error('Error creating trip:', error);
+      alert(error.response?.data?.message || 'Failed to create trip. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="max-w-3xl space-y-6 p-6">
-      <header>
-        <h1 className="text-3xl font-display font-bold glow-text">Plan a New Trip</h1>
-        <p className="mt-2 text-sm text-gray-500">Start by filling the basics — you can add stops and activities later.</p>
-      </header>
+    <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-8 duration-500">
+      {/* Page Header */}
+      <div className="mb-8">
+        <h1 className="text-4xl md:text-5xl font-display font-bold glow-text tracking-tight">
+          Plan a New Trip
+        </h1>
+        <p className="text-white/50 mt-3 text-lg">
+          Start your adventure by setting up the basics
+        </p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Trip name */}
-        <div>
-          <label className="input-label block mb-2">Trip name</label>
+      {/* Trip Form */}
+      <form onSubmit={handleSubmit} className="card space-y-8">
+        {/* Trip Name */}
+        <div className="space-y-2">
+          <label className="input-label flex items-center gap-2">
+            <Sparkles className="w-4 h-4" />
+            Trip Name
+          </label>
           <input
-            className="input-field w-full rounded-md border px-3 py-2"
-            value={tripName}
-            onChange={(e) => setTripName(e.target.value)}
-            placeholder="e.g., Summer in Europe"
+            name="name"
+            required
+            placeholder="My Paris Adventure"
+            value={formData.name}
+            onChange={handleChange}
+            className="input-field"
           />
+          <p className="text-xs text-white/30">Give your trip a memorable name</p>
         </div>
 
-        {/* Destination (with dropdown suggestions) */}
-        <div ref={dropdownRef} className="relative">
-          <label className="input-label block mb-2">Destination</label>
+        {/* Destination Search */}
+        <div className="space-y-2">
+          <label className="input-label flex items-center gap-2">
+            <MapPin className="w-4 h-4" />
+            Select a Place
+          </label>
           <div className="relative">
-            <div className="absolute left-3 top-3 pointer-events-none text-gray-400">
-              <MapPin className="h-4 w-4" />
+            <div className="relative">
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 w-5 h-5" />
+              <input
+                name="destination"
+                required
+                placeholder="Search cities... (e.g., Paris, Tokyo, New York)"
+                value={formData.destination}
+                onChange={(e) => handleDestinationSearch(e.target.value)}
+                onFocus={() => citySuggestions.length > 0 && setShowSuggestions(true)}
+                className="input-field pl-12 pr-10"
+                autoComplete="off"
+              />
+              {selectedCity && (
+                <button
+                  type="button"
+                  onClick={clearCity}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
             </div>
 
-            <input
-              className="input-field w-full rounded-md border px-10 py-2"
-              value={destination}
-              onChange={(e) => handleDestinationChange(e.target.value)}
-              onFocus={() => {
-                setShowDropdown(true);
-                refreshSuggestions(destination);
-              }}
-              placeholder="Start typing a city..."
-              aria-autocomplete="list"
-              aria-expanded={showDropdown}
-            />
-
-            {showDropdown && (
-              <div className="absolute z-30 mt-1 w-full rounded-md bg-white shadow-lg">
-                <div className="max-h-56 overflow-auto p-2">
-                  {isLoadingSuggestions ? (
-                    <div className="p-2 text-sm text-gray-500">Loading suggestions...</div>
-                  ) : citySuggestions.length === 0 ? (
-                    <div className="p-2 text-sm text-gray-500">No suggestions</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {citySuggestions.map((city) => (
-                        <div key={city.id}>
-                          <SuggestionCard city={city} onSelect={handleSelectCity} />
-                        </div>
-                      ))}
+            {/* Dropdown suggestions */}
+            {showSuggestions && citySuggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden z-20 shadow-2xl max-h-[300px] overflow-y-auto">
+                {citySuggestions.map((city, index) => (
+                  <button
+                    key={`${city.placeId}-${index}`}
+                    type="button"
+                    className="w-full px-5 py-4 text-left hover:bg-white/10 flex items-center gap-3 transition-colors border-b border-white/5 last:border-0"
+                    onClick={() => selectCity(city)}
+                  >
+                    <MapPin className="w-4 h-4 text-white/40 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium">{city.name}</div>
+                      <div className="text-xs text-white/40">{city.country}</div>
                     </div>
-                  )}
-                </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {isSearching && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden z-20 p-4 text-center text-white/50 text-sm">
+                Searching...
               </div>
             )}
           </div>
+          <p className="text-xs text-white/30">
+            Type to search for cities using Google Places autocomplete
+          </p>
         </div>
 
-        {/* Dates */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="input-label block mb-2">Start date</label>
-            <div className="relative">
-              <div className="absolute left-3 top-3 pointer-events-none text-gray-400">
-                <Calendar className="h-4 w-4" />
-              </div>
-              <input
-                type="date"
-                className="input-field w-full rounded-md border px-10 py-2"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="input-label block mb-2">End date</label>
-            <div className="relative">
-              <div className="absolute left-3 top-3 pointer-events-none text-gray-400">
-                <Calendar className="h-4 w-4" />
-              </div>
-              <input
-                type="date"
-                className="input-field w-full rounded-md border px-10 py-2"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Budget */}
-        <div>
-          <label className="input-label block mb-2">Budget (estimated)</label>
-          <div className="relative max-w-xs">
-            <div className="absolute left-3 top-3 pointer-events-none text-gray-400">
-              <DollarSign className="h-4 w-4" />
-            </div>
+        {/* Date Range */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="input-label flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Start Date
+            </label>
             <input
-              type="number"
-              min={0}
-              className="input-field w-full rounded-md border px-10 py-2"
-              value={budget === "" ? "" : String(budget)}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "") setBudget("");
-                else setBudget(Number(v));
-              }}
-              placeholder="Total budget (USD)"
+              name="startDate"
+              type="date"
+              required
+              value={formData.startDate}
+              onChange={handleChange}
+              min={new Date().toISOString().split('T')[0]}
+              className="input-field"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label className="input-label flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              End Date
+            </label>
+            <input
+              name="endDate"
+              type="date"
+              required
+              value={formData.endDate}
+              onChange={handleChange}
+              min={formData.startDate || new Date().toISOString().split('T')[0]}
+              className="input-field"
             />
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <button
-            type="submit"
-            className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
-          >
-            <Check className="mr-2 h-4 w-4" /> Create Trip
-          </button>
+        {/* Trip Description */}
+        <div className="space-y-2">
+          <label className="input-label">Trip Description (Optional)</label>
+          <textarea
+            name="description"
+            placeholder="What are you planning? Any special occasions or goals for this trip?"
+            value={formData.description}
+            onChange={handleChange}
+            rows={4}
+            className="input-field resize-none"
+          />
+        </div>
 
+        {/* Submit Button */}
+        <div className="flex gap-4 pt-4">
           <button
             type="button"
-            onClick={() => {
-              setTripName("");
-              setDestination("");
-              setSelectedCity(null);
-              setStartDate(formatISO(new Date(), { representation: "date" }));
-              setEndDate(formatISO(new Date(), { representation: "date" }));
-              setBudget("");
-            }}
-            className="inline-flex items-center rounded-md border px-3 py-2 text-sm"
+            onClick={() => navigate('/dashboard')}
+            className="btn-secondary flex-1"
           >
-            <X className="mr-2 h-4 w-4" /> Reset
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading || !selectedCity}
+            className="btn-primary flex-1 flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                Creating...
+              </>
+            ) : (
+              <>
+                <Plus className="w-5 h-5" />
+                Create Trip
+              </>
+            )}
           </button>
         </div>
       </form>
 
-      {/* Suggestions grid (explicit requirement) */}
-      <section>
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Suggestions</h2>
-          <button
-            type="button"
-            onClick={() => refreshSuggestions("")}
-            className="text-sm text-indigo-600 hover:underline"
-          >
-            Refresh
-          </button>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          {citySuggestions.map((city) => (
-            <SuggestionCard key={city.id} city={city} onSelect={handleSelectCity} />
-          ))}
-        </div>
-      </section>
+      {/* Tips Section */}
+      <div className="card border-white/5">
+        <h3 className="font-bold mb-4 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-yellow-400" />
+          Tips for Planning
+        </h3>
+        <ul className="space-y-2 text-sm text-white/60">
+          <li>• Start with flexible dates to find the best deals</li>
+          <li>• Consider weather and local events at your destination</li>
+          <li>• Book accommodations early for popular destinations</li>
+          <li>• Leave room in your itinerary for spontaneous adventures</li>
+        </ul>
+      </div>
     </div>
   );
 };
