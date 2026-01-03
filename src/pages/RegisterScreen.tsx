@@ -14,6 +14,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { User, UserRole } from '@/types';
+import { authService } from '@/services/authService';
 
 interface RegisterScreenProps {
   onLogin: (user: User) => void;
@@ -120,27 +121,28 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onLogin }) => {
     
     setIsLoading(true);
     
-    // Simulate API call - replace with actual registration endpoint
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Create user object (mock - will be replaced with API response)
-    const newUser: User = {
-      id: crypto.randomUUID(),
+    // Call backend API
+    const response = await authService.register({
       email: formData.email,
+      password: formData.password,
       firstName: formData.firstName,
       lastName: formData.lastName,
       phone: formData.phone || undefined,
       city: formData.city || undefined,
       country: formData.country || undefined,
       bio: formData.bio || undefined,
-      photoUrl: photoPreview || undefined,
-      role: UserRole.USER,
-      createdAt: new Date().toISOString(),
-    };
+    });
     
     setIsLoading(false);
-    onLogin(newUser);
-    navigate('/dashboard');
+    
+    if (response.success && response.data) {
+      onLogin(response.data.user);
+      navigate('/dashboard');
+    } else {
+      setErrors({ 
+        email: response.error || 'Registration failed. Please try again.' 
+      });
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -177,8 +179,8 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onLogin }) => {
     if (strength <= 1) return { strength, label: 'Weak', color: 'bg-red-500' };
     if (strength <= 2) return { strength, label: 'Fair', color: 'bg-orange-500' };
     if (strength <= 3) return { strength, label: 'Good', color: 'bg-yellow-500' };
-    if (strength <= 4) return { strength, label: 'Strong', color: 'bg-globe-500' };
-    return { strength, label: 'Very Strong', color: 'bg-globe-400' };
+    if (strength <= 4) return { strength, label: 'Strong', color: 'bg-white/70' };
+    return { strength, label: 'Very Strong', color: 'bg-white' };
   };
 
   const passwordStrength = getPasswordStrength();
@@ -187,9 +189,9 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onLogin }) => {
     <div className="min-h-screen flex items-center justify-center p-4 py-12 gradient-mesh relative overflow-hidden">
       {/* Animated background orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/3 -left-32 w-96 h-96 bg-globe-500/15 rounded-full blur-[120px] animate-pulse-slow" />
-        <div className="absolute bottom-1/3 -right-32 w-80 h-80 bg-globe-600/20 rounded-full blur-[100px] animate-pulse-slow delay-1000" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-globe-500/5 rounded-full blur-[150px]" />
+        <div className="absolute top-1/3 -left-32 w-96 h-96 bg-white/4 rounded-full blur-[120px] animate-pulse-slow" />
+        <div className="absolute bottom-1/3 -right-32 w-80 h-80 bg-white/5 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-white/2 rounded-full blur-[150px]" />
       </div>
 
       {/* Registration Card */}
@@ -200,8 +202,8 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onLogin }) => {
       >
         <div className="glass rounded-3xl p-8 md:p-10 glow-border relative">
           {/* Decorative corner accent */}
-          <div className="absolute top-0 left-0 w-40 h-40 bg-gradient-to-br from-globe-500/10 to-transparent rounded-tl-3xl" />
-          <div className="absolute bottom-0 right-0 w-32 h-32 bg-gradient-to-tl from-globe-500/10 to-transparent rounded-br-3xl" />
+          <div className="absolute top-0 left-0 w-40 h-40 bg-gradient-to-br from-white/5 to-transparent rounded-tl-3xl" />
+          <div className="absolute bottom-0 right-0 w-32 h-32 bg-gradient-to-tl from-white/5 to-transparent rounded-br-3xl" />
           
           {/* Back to Login */}
           <Link 
@@ -217,10 +219,10 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onLogin }) => {
             {/* Photo Upload */}
             <div className="relative mb-6 group">
               <div className={`w-28 h-28 rounded-full border-2 border-dashed 
-                            ${photoPreview ? 'border-globe-500/50' : 'border-white/20'} 
+                            ${photoPreview ? 'border-white/30' : 'border-white/20'} 
                             flex items-center justify-center overflow-hidden
                             bg-white/5 transition-all duration-300
-                            group-hover:border-globe-500/50 group-hover:bg-white/10`}>
+                            group-hover:border-white/40 group-hover:bg-white/10`}>
                 {photoPreview ? (
                   <img 
                     src={photoPreview} 
@@ -233,11 +235,11 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onLogin }) => {
               </div>
               <label 
                 htmlFor="photo-upload"
-                className="absolute bottom-0 right-0 w-9 h-9 bg-globe-500 rounded-full 
+                className="absolute bottom-0 right-0 w-9 h-9 bg-white rounded-full 
                          flex items-center justify-center cursor-pointer
-                         hover:bg-globe-600 transition-colors shadow-lg shadow-globe-500/30"
+                         hover:bg-white/90 transition-colors shadow-lg shadow-white/20"
               >
-                <Camera className="w-4 h-4 text-white" />
+                <Camera className="w-4 h-4 text-black" />
               </label>
               <input
                 id="photo-upload"
@@ -405,7 +407,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onLogin }) => {
                     placeholder="••••••••"
                   />
                   {formData.confirmPassword && formData.password === formData.confirmPassword && (
-                    <Check className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-globe-500" />
+                    <Check className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white" />
                   )}
                 </div>
                 {errors.confirmPassword && (
@@ -479,15 +481,15 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onLogin }) => {
                 id="terms"
                 required
                 className="mt-1 w-4 h-4 rounded border-white/20 bg-white/5 
-                         text-globe-500 focus:ring-globe-500/50"
+                         text-white focus:ring-white/50"
               />
               <label htmlFor="terms" className="text-sm text-white/50">
                 I agree to the{' '}
-                <button type="button" className="text-globe-400 hover:underline">
+                <button type="button" className="text-white hover:underline">
                   Terms of Service
                 </button>{' '}
                 and{' '}
-                <button type="button" className="text-globe-400 hover:underline">
+                <button type="button" className="text-white hover:underline">
                   Privacy Policy
                 </button>
               </label>
@@ -518,7 +520,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onLogin }) => {
             Already have an account?{' '}
             <Link 
               to="/"
-              className="text-globe-400 hover:text-globe-300 font-medium transition-colors"
+              className="text-white hover:text-white/80 font-medium transition-colors underline underline-offset-2"
             >
               Sign in
             </Link>

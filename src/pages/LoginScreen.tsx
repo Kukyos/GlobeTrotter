@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Globe, Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
 import { User, UserRole } from '@/types';
+import { authService } from '@/services/authService';
 
 interface LoginScreenProps {
   onLogin: (user: User) => void;
@@ -59,22 +60,22 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     
     setIsLoading(true);
     
-    // Simulate API call - replace with actual auth endpoint
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Create user object (mock - will be replaced with API response)
-    const user: User = {
-      id: crypto.randomUUID(),
+    // Call backend API
+    const response = await authService.login({
       email: formData.email,
-      firstName: formData.email.split('@')[0],
-      lastName: '',
-      role: UserRole.USER,
-      createdAt: new Date().toISOString(),
-    };
+      password: formData.password,
+    });
     
     setIsLoading(false);
-    onLogin(user);
-    navigate('/dashboard');
+    
+    if (response.success && response.data) {
+      onLogin(response.data.user);
+      navigate('/dashboard');
+    } else {
+      setErrors({ 
+        email: response.error || 'Login failed. Please check your credentials.' 
+      });
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,9 +91,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     <div className="min-h-screen flex items-center justify-center p-4 gradient-mesh relative overflow-hidden">
       {/* Animated background orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -left-20 w-72 h-72 bg-globe-500/20 rounded-full blur-[100px] animate-pulse-slow" />
-        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-globe-600/15 rounded-full blur-[120px] animate-pulse-slow delay-1000" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-globe-500/5 rounded-full blur-[150px]" />
+        <div className="absolute top-1/4 -left-20 w-72 h-72 bg-white/5 rounded-full blur-[100px] animate-pulse-slow" />
+        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-white/3 rounded-full blur-[120px] animate-pulse-slow" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/2 rounded-full blur-[150px]" />
       </div>
 
       {/* Login Card */}
@@ -103,19 +104,19 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       >
         <div className="glass rounded-3xl p-8 md:p-10 glow-border relative">
           {/* Decorative corner accent */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-globe-500/10 to-transparent rounded-tr-3xl" />
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-white/5 to-transparent rounded-tr-3xl" />
           
           {/* Logo & Header */}
           <div className="flex flex-col items-center mb-10 relative">
             {/* Animated Globe Icon */}
             <div className="relative mb-6">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-globe-500/20 to-globe-600/10 
-                            flex items-center justify-center border border-globe-500/30 
-                            shadow-[0_0_40px_rgba(34,197,94,0.2)] animate-float">
-                <Globe className="w-12 h-12 text-globe-400" strokeWidth={1.5} />
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-white/10 to-white/5 
+                            flex items-center justify-center border border-white/20 
+                            shadow-[0_0_40px_rgba(255,255,255,0.1)] animate-float">
+                <Globe className="w-12 h-12 text-white/80" strokeWidth={1.5} />
               </div>
               {/* Sparkle accent */}
-              <Sparkles className="absolute -top-1 -right-1 w-5 h-5 text-globe-400 animate-pulse" />
+              <Sparkles className="absolute -top-1 -right-1 w-5 h-5 text-white/60 animate-pulse" />
             </div>
             
             <h1 className="text-3xl md:text-4xl font-display font-bold text-white glow-text">
@@ -194,7 +195,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             <div className="flex justify-end">
               <button
                 type="button"
-                className="text-white/40 hover:text-globe-400 text-sm transition-colors"
+                className="text-white/40 hover:text-white text-sm transition-colors"
               >
                 Forgot password?
               </button>
@@ -236,14 +237,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             className="btn-secondary w-full flex items-center justify-center gap-2 group"
           >
             <span>Create an Account</span>
-            <Sparkles className="w-4 h-4 text-globe-400 group-hover:scale-110 transition-transform" />
+            <Sparkles className="w-4 h-4 text-white/60 group-hover:scale-110 transition-transform" />
           </Link>
         </div>
 
         {/* Footer */}
         <p className="text-center text-white/30 text-sm mt-6">
           By signing in, you agree to our{' '}
-          <button className="text-white/50 hover:text-globe-400 transition-colors underline underline-offset-2">
+          <button className="text-white/50 hover:text-white transition-colors underline underline-offset-2">
             Terms of Service
           </button>
         </p>
