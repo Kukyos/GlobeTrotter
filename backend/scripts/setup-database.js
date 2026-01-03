@@ -16,7 +16,8 @@ async function setupDatabase() {
       host: process.env.DB_HOST || 'localhost',
       user: process.env.DB_USER || 'root',
       password: process.env.DB_PASSWORD,
-      port: parseInt(process.env.DB_PORT) || 3306
+      port: parseInt(process.env.DB_PORT) || 3306,
+      multipleStatements: true
     });
 
     console.log('✅ Connected to MySQL server');
@@ -33,17 +34,8 @@ async function setupDatabase() {
     const schemaPath = path.join(__dirname, '..', '..', 'DATABASE_SCHEMA.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
 
-    // Split by semicolons and execute each statement
-    const statements = schema
-      .split(';')
-      .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--'));
-
-    for (const statement of statements) {
-      if (statement) {
-        await connection.query(statement);
-      }
-    }
+    // Execute the entire schema at once (handles DELIMITER statements properly)
+    await connection.query(schema);
 
     console.log('✅ Database schema created successfully');
 
