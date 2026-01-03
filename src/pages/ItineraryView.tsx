@@ -1,33 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
-  Eye,
-  Save,
-  Plus,
-  ChevronUp,
-  ChevronDown,
-  Trash2,
+  Edit,
+  Share2,
+  MapPin,
+  Calendar,
+  DollarSign,
+  Clock,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import type { Trip, Stop, Activity } from "../types/trip";
+import { format, parseISO, differenceInCalendarDays } from "date-fns";
+import type { Trip, Stop } from "../types/trip";
 
 /**
- * ItineraryBuilder.tsx
+ * ItineraryView.tsx
  *
- * Screen: Itinerary Builder
+ * Screen: Itinerary View (Read-only)
  *
- * Requirements implemented:
- * - Interactive interface to add Cities/Stops to a trip.
- * - Allow reordering of stops (Move Up/Down).
- * - StopSection component with drag handle (move buttons), date range, activity list.
- *
- * Component signature:
- * interface ItineraryBuilderProps {
- *   trips: Trip[];
- *   stops: Stop[];
- *   setStops: React.Dispatch<React.SetStateAction<Stop[]>>;
- * }
+ * Displays the trip itinerary in a beautiful, read-only format.
+ * Users can navigate to the builder to edit.
  */
 
 /* ---------------- Mock API (simulated) ---------------- */
@@ -38,11 +29,14 @@ const mockGetTrip = (tripId: string): Promise<Trip> =>
         resolve({
           id: tripId,
           userId: "member-b",
-          name: "Sample Trip",
+          name: "European Adventure",
           destination: "Various",
           startDate: format(new Date(), "yyyy-MM-dd"),
-          endDate: format(new Date(), "yyyy-MM-dd"),
+          endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
           status: "upcoming",
+          description: "An amazing journey through Europe's most beautiful cities.",
+          coverPhoto: "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80",
+          totalBudget: 5000,
         }),
       350
     )
@@ -59,17 +53,26 @@ const mockGetStops = (tripId: string): Promise<Stop[]> =>
             cityName: "Lisbon",
             country: "Portugal",
             startDate: format(new Date(), "yyyy-MM-dd"),
-            endDate: format(new Date(), "yyyy-MM-dd"),
-            budget: 500,
+            endDate: format(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
+            budget: 800,
           },
           {
             id: "stop-2",
             tripId,
             cityName: "Seville",
             country: "Spain",
-            startDate: format(new Date(), "yyyy-MM-dd"),
-            endDate: format(new Date(), "yyyy-MM-dd"),
-            budget: 300,
+            startDate: format(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
+            endDate: format(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
+            budget: 600,
+          },
+          {
+            id: "stop-3",
+            tripId,
+            cityName: "Barcelona",
+            country: "Spain",
+            startDate: format(new Date(Date.now() + 6 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
+            endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
+            budget: 900,
           },
         ]),
       400
@@ -86,160 +89,77 @@ const formatDate = (iso?: string) => {
   }
 };
 
-const calculateStopBudget = (stopId: string, stops: Stop[], activities: Activity[]) => {
-  const stop = stops.find((s) => s.id === stopId);
-  const activitiesSum = activities.filter((a) => a.stopId === stopId).reduce((s, a) => s + (a.cost || 0), 0);
-  return (stop?.budget || 0) + activitiesSum;
+const calculateDays = (start?: string, end?: string) => {
+  if (!start || !end) return 0;
+  try {
+    return Math.max(1, differenceInCalendarDays(parseISO(end), parseISO(start)) + 1);
+  } catch {
+    return 0;
+  }
 };
 
-/* ---------------- ActivityItem (simple) ---------------- */
-const ActivityItem: React.FC<{ activity: Activity }> = ({ activity }) => (
-  <div className="flex items-center justify-between rounded-md bg-white/5 px-3 py-2">
-    <div>
-      <div className="text-sm font-medium">{activity.name}</div>
-      <div className="text-xs text-white/50">{activity.category} • {activity.location || "—"}</div>
-    </div>
-    <div className="text-sm text-white/50">${activity.cost.toFixed(2)}</div>
-  </div>
-);
-
-/* ---------------- StopSection component ---------------- */
-interface StopSectionProps {
+/* ---------------- StopCard Component (Read-only) ---------------- */
+interface StopCardProps {
   stop: Stop;
   index: number;
-  stops: Stop[];
-  activities: Activity[];
-  onUpdate: (partial: Partial<Stop>) => void;
-  onDelete: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  isFirst: boolean;
-  isLast: boolean;
 }
 
-const StopSection: React.FC<StopSectionProps> = ({
-  stop,
-  index,
-  stops,
-  activities,
-  onUpdate,
-  onDelete,
-  onMoveUp,
-  onMoveDown,
-  isFirst,
-  isLast,
-}) => {
-  const stopActivities = activities.filter((a) => a.stopId === stop.id);
-
+const StopCard: React.FC<StopCardProps> = ({ stop, index }) => {
+  const days = calculateDays(stop.startDate, stop.endDate);
+  
   return (
-    <div className="card relative border rounded-xl p-4">
-      {/* Drag handle & section number */}
-      <div className="flex items-center gap-4 mb-4">
-        <div className="flex flex-col gap-1">
-          <button
-            onClick={onMoveUp}
-            disabled={isFirst}
-            className="p-1 hover:bg-white/10 rounded disabled:opacity-30"
-            aria-label={`Move section ${index + 1} up`}
-          >
-            <ChevronUp className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onMoveDown}
-            disabled={isLast}
-            className="p-1 hover:bg-white/10 rounded disabled:opacity-30"
-            aria-label={`Move section ${index + 1} down`}
-          >
-            <ChevronDown className="w-4 h-4" />
-          </button>
+    <div className="card hover-lift animate-scale-in" style={{ animationDelay: `${index * 100}ms` }}>
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-xl font-bold">
+            {index + 1}
+          </div>
+          <div>
+            <h3 className="text-2xl font-bold font-heading">{stop.cityName}</h3>
+            <p className="text-white/50 flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              {stop.country}
+            </p>
+          </div>
         </div>
-
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold">Section {index + 1}:</h3>
-          <p className="text-white/50 text-sm">{stop.cityName}, {stop.country}</p>
-        </div>
-
-        <button onClick={onDelete} className="text-red-400 hover:text-red-300 p-2" aria-label="Delete section">
-          <Trash2 className="w-5 h-5" />
-        </button>
+        {stop.budget && (
+          <div className="text-right">
+            <div className="text-sm text-white/40">Budget</div>
+            <div className="text-xl font-bold">${stop.budget}</div>
+          </div>
+        )}
       </div>
 
-      {/* Section content */}
-      <div className="pl-12 space-y-4">
-        <p className="text-white/60">
-          All the necessary information about this section.
-          This can be anything like travel section, hotel or any other activity.
-        </p>
-
-        {/* Date range and budget */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white/5 rounded-lg p-3">
-            <label className="text-xs text-white/40">Date Range</label>
-            <p className="font-medium">
-              {formatDate(stop.startDate)} to {formatDate(stop.endDate)}
-            </p>
-            <div className="mt-2 flex gap-2">
-              <input
-                type="date"
-                className="input-field"
-                value={stop.startDate}
-                onChange={(e) => onUpdate({ startDate: e.target.value })}
-              />
-              <input
-                type="date"
-                className="input-field"
-                value={stop.endDate}
-                onChange={(e) => onUpdate({ endDate: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="bg-white/5 rounded-lg p-3">
-            <label className="text-xs text-white/40">Budget of this section</label>
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                type="number"
-                min={0}
-                className="input-field"
-                value={stop.budget ?? ""}
-                onChange={(e) => onUpdate({ budget: e.target.value === "" ? undefined : Number(e.target.value) })}
-              />
-              <div className="text-sm text-white/50">Estimated: ${calculateStopBudget(stop.id, stops, activities)}</div>
-            </div>
-          </div>
+      <div className="flex flex-wrap gap-4 text-sm text-white/60">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4" />
+          <span>{formatDate(stop.startDate)}</span>
         </div>
-
-        {/* Activities list */}
-        <div>
-          <h4 className="text-sm font-medium mb-2">Activities</h4>
-          <div className="space-y-2">
-            {stopActivities.map((activity) => (
-              <ActivityItem key={activity.id} activity={activity} />
-            ))}
-          </div>
-          <div className="mt-2 flex gap-2">
-            <button className="btn-secondary text-sm inline-flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Add Activity
-            </button>
-          </div>
+        <span>→</span>
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4" />
+          <span>{formatDate(stop.endDate)}</span>
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <Clock className="w-4 h-4" />
+          <span>{days} {days === 1 ? 'day' : 'days'}</span>
         </div>
       </div>
     </div>
   );
 };
 
-/* ---------------- Main ItineraryBuilder Component ---------------- */
-interface ItineraryBuilderProps {
+/* ---------------- Main ItineraryView Component ---------------- */
+interface ItineraryViewProps {
   tripId?: string;
-  // optional props to allow parent-managed stops for integration tests
-  initialStops?: Stop[];
 }
 
-const ItineraryBuilder: React.FC<ItineraryBuilderProps> = ({ tripId = "trip-1", initialStops = [] }) => {
+const ItineraryView: React.FC<ItineraryViewProps> = ({ tripId: propTripId }) => {
+  const { tripId: paramTripId } = useParams<{ tripId: string }>();
+  const tripId = propTripId || paramTripId || "trip-1";
+  
   const [trip, setTrip] = useState<Trip | null>(null);
-  const [stops, setStops] = useState<Stop[]>(initialStops);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [isDirty, setIsDirty] = useState(false);
+  const [stops, setStops] = useState<Stop[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -250,126 +170,157 @@ const ItineraryBuilder: React.FC<ItineraryBuilderProps> = ({ tripId = "trip-1", 
       if (!mounted) return;
       setTrip(t);
       setStops(s);
-      // activities would be fetched per-stop in a real app; keep empty sample here
-      setActivities([]);
       setIsLoading(false);
     };
-    if (!initialStops.length) load();
-    else setIsLoading(false);
+    load();
     return () => {
       mounted = false;
     };
-  }, [tripId, initialStops.length]);
+  }, [tripId]);
 
-  const addNewStop = () => {
-    const newStop: Stop = {
-      id: `stop-${Date.now()}`,
-      tripId: tripId,
-      cityName: "New City",
-      country: "Country",
-      startDate: format(new Date(), "yyyy-MM-dd"),
-      endDate: format(new Date(), "yyyy-MM-dd"),
-      budget: 0,
-    };
-    setStops((prev) => [...prev, newStop]);
-    setIsDirty(true);
-  };
+  const totalDays = calculateDays(trip?.startDate, trip?.endDate);
+  const totalBudget = stops.reduce((sum, stop) => sum + (stop.budget || 0), 0);
 
-  const updateStop = (stopId: string, partial: Partial<Stop>) => {
-    setStops((prev) => prev.map((s) => (s.id === stopId ? { ...s, ...partial } : s)));
-    setIsDirty(true);
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-white/50 animate-pulse">Loading itinerary...</div>
+      </div>
+    );
+  }
 
-  const deleteStop = (stopId: string) => {
-    setStops((prev) => prev.filter((s) => s.id !== stopId));
-    setIsDirty(true);
-  };
-
-  const moveStop = (fromIndex: number, toIndex: number) => {
-    if (toIndex < 0 || toIndex >= stops.length) return;
-    setStops((prev) => {
-      const copy = [...prev];
-      const [item] = copy.splice(fromIndex, 1);
-      copy.splice(toIndex, 0, item);
-      return copy;
-    });
-    setIsDirty(true);
-  };
-
-  const saveItinerary = async () => {
-    // In real app: call API to save stops and order
-    // Mock with timeout
-    setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 600));
-    setIsDirty(false);
-    setIsLoading(false);
-    alert("Itinerary saved (mock).");
-  };
-
-  const preview = () => {
-    alert("Preview (mock)");
-  };
+  if (!trip) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-white/50">Trip not found</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl p-6 space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <Link to="/my-trips" className="text-white/50 hover:text-white text-sm flex items-center gap-1 mb-2">
-            <ArrowLeft className="w-4 h-4" /> Back to My Trips
-          </Link>
-          <h1 className="text-3xl font-display font-bold">{trip?.name ?? "Untitled Trip"}</h1>
-          <p className="text-white/50">
-            {trip ? `${formatDate(trip.startDate)} - ${formatDate(trip.endDate)}` : "—"}
-          </p>
-        </div>
-
-        <div className="flex gap-2">
-          <button onClick={preview} className="btn-secondary inline-flex items-center gap-2">
-            <Eye className="w-4 h-4" /> Preview
-          </button>
-          <button onClick={saveItinerary} className="btn-primary inline-flex items-center gap-2">
-            <Save className="w-4 h-4" /> Save
-          </button>
-        </div>
-      </div>
-
-      {/* Sections / Stops List */}
-      <div className="space-y-6">
-        {stops.map((stop, index) => (
-          <StopSection
-            key={stop.id}
-            stop={stop}
-            index={index}
-            stops={stops}
-            activities={activities}
-            onUpdate={(partial) => updateStop(stop.id, partial)}
-            onDelete={() => deleteStop(stop.id)}
-            onMoveUp={() => moveStop(index, index - 1)}
-            onMoveDown={() => moveStop(index, index + 1)}
-            isFirst={index === 0}
-            isLast={index === stops.length - 1}
-          />
-        ))}
-      </div>
-
-      {/* Add Section Button */}
-      <div>
-        <button
-          onClick={addNewStop}
-          className="w-full border-2 border-dashed border-white/20 rounded-2xl p-8 hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all flex items-center justify-center gap-2 text-white/50 hover:text-white"
+    <div className="space-y-8 animate-fade-in">
+      {/* Header */}
+      <div className="relative">
+        <Link 
+          to="/my-trips" 
+          className="inline-flex items-center gap-2 text-white/50 hover:text-white transition-all mb-6 hover:translate-x-[-4px]"
         >
-          <Plus className="w-5 h-5" />
-          Add another Section
-        </button>
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to My Trips</span>
+        </Link>
+
+        {/* Hero Section */}
+        <div className="relative h-96 rounded-3xl overflow-hidden border border-white/10 shadow-2xl animate-scale-in">
+          {trip.coverPhoto && (
+            <img
+              src={trip.coverPhoto}
+              alt={trip.name}
+              className="w-full h-full object-cover brightness-[0.4]"
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent flex flex-col justify-end p-8">
+            <div className="mb-4">
+              <span className={`text-xs uppercase tracking-widest px-3 py-1 rounded-full ${
+                trip.status === 'ongoing' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                trip.status === 'upcoming' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                'bg-white/10 text-white/60 border border-white/20'
+              }`}>
+                {trip.status}
+              </span>
+            </div>
+            <h1 className="text-5xl font-bold font-heading glow-text mb-4">{trip.name}</h1>
+            {trip.description && (
+              <p className="text-xl text-white/70 max-w-2xl">{trip.description}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 mt-6 animate-fade-in-up">
+          <Link
+            to={`/itinerary/${tripId}/builder`}
+            className="btn-primary inline-flex items-center gap-2"
+          >
+            <Edit className="w-4 h-4" />
+            Edit Itinerary
+          </Link>
+          <button className="btn-secondary inline-flex items-center gap-2">
+            <Share2 className="w-4 h-4" />
+            Share
+          </button>
+        </div>
       </div>
 
-      {/* Dirty indicator */}
-      {isDirty && <div className="text-sm text-yellow-300">You have unsaved changes.</div>}
+      {/* Trip Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+        <div className="card hover-scale">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="text-sm text-white/40">Duration</div>
+              <div className="text-2xl font-bold">{totalDays} Days</div>
+            </div>
+          </div>
+        </div>
 
-      {/* Loading overlay */}
-      {isLoading && <div className="text-sm text-white/50">Loading...</div>}
+        <div className="card hover-scale">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
+              <MapPin className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="text-sm text-white/40">Stops</div>
+              <div className="text-2xl font-bold">{stops.length} Cities</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card hover-scale">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
+              <DollarSign className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="text-sm text-white/40">Total Budget</div>
+              <div className="text-2xl font-bold">${totalBudget}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Trip Details */}
+      <div className="space-y-6 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-3xl font-bold font-heading">Your Journey</h2>
+          <div className="text-sm text-white/50">
+            {formatDate(trip.startDate)} → {formatDate(trip.endDate)}
+          </div>
+        </div>
+
+        {/* Stops List */}
+        <div className="space-y-4">
+          {stops.map((stop, index) => (
+            <StopCard key={stop.id} stop={stop} index={index} />
+          ))}
+        </div>
+
+        {stops.length === 0 && (
+          <div className="card text-center py-12">
+            <p className="text-white/40 mb-4">No stops added yet</p>
+            <Link
+              to={`/itinerary/${tripId}/builder`}
+              className="btn-primary inline-flex items-center gap-2"
+            >
+              <Edit className="w-4 h-4" />
+              Start Planning
+            </Link>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-export default ItineraryBuilder;
+export default ItineraryView;

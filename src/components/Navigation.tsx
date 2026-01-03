@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { User } from '../types';
-import { Search } from 'lucide-react';
+import { Search, X, LogOut } from 'lucide-react';
+import { searchCities } from '../services/supabaseService';
 
 interface NavigationProps {
   user: User | null;
@@ -10,85 +11,247 @@ interface NavigationProps {
 
 const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
   const location = useLocation();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedFilter, setSelectedFilter] = useState('All');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  if (!user && !['/login', '/register'].includes(location.pathname)) return null;
+  const activateSearch = () => {
+    setSearchActive(true);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  };
+
+  const deactivateSearch = () => {
+    setSearchActive(false);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  // Handle search
+  useEffect(() => {
+    const searchDebounce = setTimeout(async () => {
+      if (searchQuery.trim().length > 1) {
+        const { cities } = await searchCities(searchQuery);
+        setSearchResults(cities);
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(searchDebounce);
+  }, [searchQuery]);
+
+  // Close on escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && searchActive) {
+        deactivateSearch();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [searchActive]);
+
+  // Close on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchActive && searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        deactivateSearch();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [searchActive]);
+
   if (!user) return null;
 
   return (
-    <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] w-auto">
-      <div 
-        className={`pill-nav-transition glass border border-white/20 rounded-full overflow-hidden flex items-center shadow-[0_0_30px_rgba(0,0,0,0.5)] ${
-          isExpanded ? 'px-6 py-3 gap-6' : 'p-2'
+    <>
+      {/* Search Overlay Backdrop */}
+      <div
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-500 z-[80] ${
+          searchActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
-      >
-        <button 
-          onClick={() => setIsExpanded(!isExpanded)}
-          className={`flex items-center gap-3 transition-all duration-300 ${isExpanded ? 'opacity-100' : 'opacity-100'}`}
-        >
-          <div className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center font-bold shadow-lg">
-            GT
-          </div>
-          {isExpanded && <span className="font-heading font-bold text-lg glow-text">GlobeTrotter</span>}
-        </button>
+        onClick={deactivateSearch}
+      />
 
-        {isExpanded && (
-          <div className="flex items-center gap-6 border-l border-white/10 pl-6 animate-in fade-in slide-in-from-left-4 duration-500">
+      {/* Navigation Bar */}
+      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] animate-fade-in-down">
+        <div className="glass border border-white/20 rounded-2xl px-4 py-2.5 flex items-center gap-4 shadow-2xl shadow-black/50">
+          {/* Logo */}
+          <Link to="/dashboard" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 rounded-lg bg-white text-black flex items-center justify-center font-bold text-sm shadow-lg group-hover:scale-110 transition-transform">
+              GT
+            </div>
+            <span className="font-heading font-bold text-sm hidden sm:block text-white/90 group-hover:text-white transition-colors">
+              GlobeTrotter
+            </span>
+          </Link>
+
+          {/* Divider */}
+          <div className="w-px h-6 bg-white/10" />
+
+          {/* Nav Links */}
+          <div className="flex items-center gap-1">
             <Link 
               to="/dashboard" 
-              className={`text-sm font-medium transition-colors ${location.pathname === '/dashboard' ? 'text-white' : 'text-white/50 hover:text-white'}`}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                location.pathname === '/dashboard' 
+                  ? 'bg-white/10 text-white' 
+                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
             >
               Dashboard
             </Link>
             <Link 
               to="/my-trips" 
-              className={`text-sm font-medium transition-colors ${location.pathname === '/my-trips' ? 'text-white' : 'text-white/50 hover:text-white'}`}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                location.pathname === '/my-trips' || location.pathname.startsWith('/itinerary')
+                  ? 'bg-white/10 text-white' 
+                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
             >
               Trips
             </Link>
-            
-            {/* Search Button - Will trigger overlay for Member C */}
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-6 bg-white/10" />
+
+          {/* Search */}
+          <div ref={searchContainerRef} className="relative">
             <button
-              className="text-sm font-medium text-white/50 hover:text-white transition-colors flex items-center gap-2"
-              onClick={() => {
-                // TODO: Member C - Open search overlay with 0.8 opacity
-                console.log('Search clicked - Member C to implement overlay');
-              }}
+              onClick={activateSearch}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                searchActive 
+                  ? 'bg-white/20 text-white' 
+                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
             >
               <Search className="w-4 h-4" />
-              <span>Search</span>
-            </button>
-
-            <Link 
-              to="/profile" 
-              className={`text-sm font-medium transition-colors ${location.pathname === '/profile' ? 'text-white' : 'text-white/50 hover:text-white'}`}
-            >
-              Profile
-            </Link>
-            {user.role === 'admin' && (
-              <Link 
-                to="/admin" 
-                className={`text-sm font-medium transition-colors ${location.pathname === '/admin' ? 'text-white' : 'text-white/50 hover:text-white'}`}
-              >
-                Admin
-              </Link>
-            )}
-            <button
-              onClick={onLogout}
-              className="text-xs bg-white/10 px-3 py-1.5 rounded-full border border-white/20 hover:bg-white hover:text-black transition-all"
-            >
-              Logout
+              <span className="hidden sm:block">Search</span>
             </button>
           </div>
-        )}
-      </div>
-      
-      {!isExpanded && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 text-[10px] uppercase tracking-widest text-white/20 animate-subtle-glow whitespace-nowrap">
-          Click to expand
+
+          {/* Divider */}
+          <div className="w-px h-6 bg-white/10" />
+
+          {/* User Menu */}
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white">
+              {user.name?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <button
+              onClick={onLogout}
+              className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Search Modal */}
+      {searchActive && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[90] w-full max-w-2xl px-4 animate-fade-in">
+          <div className="glass border border-white/20 rounded-2xl overflow-hidden shadow-2xl">
+            {/* Search Input */}
+            <div className="relative p-4 border-b border-white/10">
+              <Search className="absolute left-7 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search cities, destinations..."
+                className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-12 py-3 text-white placeholder-white/40 focus:outline-none focus:border-white/30 transition-all"
+                autoFocus
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-7 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filters */}
+            <div className="px-4 py-3 flex gap-2 border-b border-white/10 overflow-x-auto">
+              {['All', 'Cities', 'Trips'].map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setSelectedFilter(filter)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                    selectedFilter === filter
+                      ? 'bg-white text-black'
+                      : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  }`}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+
+            {/* Results */}
+            <div className="max-h-80 overflow-y-auto">
+              {searchQuery.length > 1 ? (
+                searchResults.length > 0 ? (
+                  <div className="p-2">
+                    {searchResults.map((city) => (
+                      <Link
+                        key={city.id}
+                        to={`/create-trip?city=${encodeURIComponent(city.name)}`}
+                        onClick={deactivateSearch}
+                        className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition-all group"
+                      >
+                        {city.image_url ? (
+                          <img 
+                            src={city.image_url} 
+                            alt={city.name}
+                            className="w-12 h-12 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center">
+                            <span className="text-lg">🌍</span>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-white group-hover:text-white/90">
+                            {city.name}
+                          </h4>
+                          <p className="text-sm text-white/50">
+                            {city.country} • {city.continent}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-white/40">
+                            {'$'.repeat(city.cost_index)}
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-white/50">
+                    <p>No results found for "{searchQuery}"</p>
+                  </div>
+                )
+              ) : (
+                <div className="p-8 text-center text-white/40">
+                  <Search className="w-8 h-8 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">Start typing to search destinations</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

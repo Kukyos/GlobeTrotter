@@ -106,7 +106,7 @@ interface TripListCardProps {
 
 const TripListCard: React.FC<TripListCardProps> = ({ trip, onView, onEdit, onDelete }) => {
   return (
-    <div className="card flex flex-col md:flex-row md:items-center gap-4 hover:border-white/20 transition-all border rounded-xl p-4">
+    <div className="card flex flex-col md:flex-row md:items-center gap-4 hover:border-white/20 transition-all border rounded-xl p-4 animate-scale-in hover-lift">
       {/* Cover image */}
       <div className="w-full md:w-48 h-32 rounded-xl overflow-hidden bg-white/5 flex-shrink-0">
         {trip.coverPhoto ? (
@@ -143,7 +143,7 @@ const TripListCard: React.FC<TripListCardProps> = ({ trip, onView, onEdit, onDel
         <button onClick={onEdit} className="btn-secondary py-2">
           Edit
         </button>
-        <button onClick={onDelete} className="btn-secondary py-2 text-red-400">
+        <button onClick={onDelete} className="btn-secondary py-2 text-red-400 flex items-center justify-center">
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
@@ -224,11 +224,8 @@ const MyTrips: React.FC<MyTripsProps> = ({ trips, setTrips }) => {
 
   /* Handlers for card actions */
   const handleView = (trip: Trip) => {
-    // In a real app: navigate to trip details
-    // For now just console.log
-    // eslint-disable-next-line no-console
-    console.log("View trip", trip.id);
-    alert(`View trip: ${trip.name} (mock)`);
+    // Navigate to itinerary view
+    window.location.href = `/itinerary/${trip.id}`;
   };
 
   const handleEdit = (trip: Trip) => {
@@ -286,7 +283,7 @@ const MyTrips: React.FC<MyTripsProps> = ({ trips, setTrips }) => {
 
         {/* Group By */}
         <select
-          className="input-field w-auto"
+          className="input-field w-auto transition-all duration-300 hover:bg-white/10 hover:border-white/30 cursor-pointer animate-fade-in"
           value={groupBy}
           onChange={(e) => setGroupBy(e.target.value)}
         >
@@ -297,7 +294,8 @@ const MyTrips: React.FC<MyTripsProps> = ({ trips, setTrips }) => {
 
         {/* Filter */}
         <select
-          className="input-field w-auto"
+          className="input-field w-auto transition-all duration-300 hover:bg-white/10 hover:border-white/30 cursor-pointer animate-fade-in"
+          style={{ animationDelay: '100ms' }}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         >
@@ -310,7 +308,8 @@ const MyTrips: React.FC<MyTripsProps> = ({ trips, setTrips }) => {
 
         {/* Sort */}
         <select
-          className="input-field w-auto"
+          className="input-field w-auto transition-all duration-300 hover:bg-white/10 hover:border-white/30 cursor-pointer animate-fade-in"
+          style={{ animationDelay: '200ms' }}
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
         >

@@ -14,7 +14,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { User, UserRole } from '@/types';
-import { authService } from '@/services/authService';
+import { signUp } from '@/services/supabaseService';
 
 interface RegisterScreenProps {
   onLogin: (user: User) => void;
@@ -121,26 +121,32 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ onLogin }) => {
     
     setIsLoading(true);
     
-    // Call backend API
-    const response = await authService.register({
-      email: formData.email,
-      password: formData.password,
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      phone: formData.phone || undefined,
-      city: formData.city || undefined,
-      country: formData.country || undefined,
-      bio: formData.bio || undefined,
-    });
-    
-    setIsLoading(false);
-    
-    if (response.success && response.data) {
-      onLogin(response.data.user);
-      navigate('/dashboard');
-    } else {
+    try {
+      // Call Supabase Auth
+      const fullName = `${formData.firstName} ${formData.lastName}`;
+      const { user, error } = await signUp(formData.email, formData.password, fullName);
+      
+      setIsLoading(false);
+      
+      if (user && !error) {
+        const mappedUser: User = {
+          id: user.id,
+          email: user.email || '',
+          name: fullName,
+          role: 'user' as UserRole,
+          avatar: undefined
+        };
+        onLogin(mappedUser);
+        navigate('/dashboard');
+      } else {
+        setErrors({ 
+          email: error || 'Registration failed. Please try again.' 
+        });
+      }
+    } catch (err) {
+      setIsLoading(false);
       setErrors({ 
-        email: response.error || 'Registration failed. Please try again.' 
+        email: 'An unexpected error occurred. Please try again.' 
       });
     }
   };
