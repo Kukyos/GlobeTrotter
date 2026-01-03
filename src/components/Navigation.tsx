@@ -14,7 +14,7 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
   const [searchHovered, setSearchHovered] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('All');
+  const [selectedFilter, setSelectedFilter] = useState('Popular');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -39,15 +39,28 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [searchActive]);
 
+  // Lock body scroll when search is active
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchActive && searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
-        deactivateSearch();
-      }
+    if (searchActive) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [searchActive]);
+
+  // Disabled click-outside to keep search open when clicking filters/cards
+  // useEffect(() => {
+  //   const handleClickOutside = (e: MouseEvent) => {
+  //     if (searchActive && searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+  //       deactivateSearch();
+  //     }
+  //   };
+  //   document.addEventListener('mousedown', handleClickOutside);
+  //   return () => document.removeEventListener('mousedown', handleClickOutside);
+  // }, [searchActive]);
 
   if (!user && !['/login', '/register'].includes(location.pathname)) return null;
   if (!user) return null;
@@ -55,9 +68,10 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
   return (
     <>
       <div 
-        className={`fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-500 z-[80] ${
+        className={`fixed inset-0 bg-black/20 transition-opacity duration-500 z-[80] ${
           searchActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
+        onClick={deactivateSearch}
         aria-hidden={!searchActive}
       />
 
@@ -171,10 +185,14 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
       </div>
 
       {searchActive && searchQuery && (
-        <div className="fixed top-[120px] left-0 right-0 z-[70] animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className="max-w-[1400px] mx-auto px-8 mb-6">
+        <div 
+          className="fixed top-[120px] left-0 right-0 bottom-0 z-[150] animate-in fade-in slide-in-from-top-4 duration-300 overflow-y-auto bg-black/20"
+          onClick={(e) => e.stopPropagation()}
+          style={{ backdropFilter: 'blur(80px) saturate(150%)', WebkitBackdropFilter: 'blur(80px) saturate(150%)' }}
+        >
+          <div className="max-w-[1400px] mx-auto px-8 mb-6 pt-6 sticky top-0 bg-black/30 z-10 pb-4" style={{ backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)' }}>
             <div className="flex items-center gap-3 justify-center">
-              {['All', 'Cities', 'Trips', 'Activities'].map((filter) => (
+              {['Popular', 'Budget', 'Moderate', 'Luxury', 'Hidden Gems', 'Less Crowded', 'All'].map((filter) => (
                 <button
                   key={filter}
                   onClick={() => setSelectedFilter(filter)}
@@ -193,25 +211,43 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
           <div className="max-w-[1400px] mx-auto px-8 pb-20">
             <div className="masonry-grid">
               {[
-                { type: 'City', title: 'Tokyo, Japan', desc: 'Bustling metropolis with ancient temples', img: true },
-                { type: 'Trip', title: 'Summer Adventure 2026', desc: '14 days across Southeast Asia', img: false },
-                { type: 'Activity', title: 'Temple Visit', desc: 'Historic Senso-ji Temple tour', img: true },
-                { type: 'City', title: 'Paris, France', desc: 'The city of lights and romance', img: true },
-                { type: 'Trip', title: 'European Backpacking', desc: '30 days, 8 countries', img: false },
-                { type: 'Activity', title: 'Mountain Hiking', desc: 'Swiss Alps hiking experience', img: true },
-                { type: 'City', title: 'New York, USA', desc: 'The city that never sleeps', img: true },
-                { type: 'Activity', title: 'Scuba Diving', desc: 'Great Barrier Reef adventure', img: true },
+                { type: 'City', title: 'Tokyo, Japan', desc: 'Bustling metropolis with ancient temples', img: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800', details: ['Visit Senso-ji Temple', 'Explore Shibuya Crossing', 'Try authentic ramen', 'Cherry blossom viewing'], price: '$$' },
+                { type: 'Trip', title: 'Summer Adventure 2026', desc: '14 days across Southeast Asia', img: '', details: ['Thailand beaches', 'Vietnam street food', 'Cambodia temples', 'Bali waterfalls'], price: '$' },
+                { type: 'Activity', title: 'Temple Visit', desc: 'Historic Senso-ji Temple tour', img: 'https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=800', details: ['2-hour guided tour', 'Traditional tea ceremony', 'Cultural insights', 'Photo opportunities'], price: '$' },
+                { type: 'City', title: 'Paris, France', desc: 'The city of lights and romance', img: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800', details: ['Eiffel Tower visit', 'Louvre Museum', 'Seine River cruise', 'French cuisine tasting'], price: '$$$' },
+                { type: 'Trip', title: 'European Backpacking', desc: '30 days, 8 countries', img: '', details: ['Paris, Rome, Berlin', 'Prague, Vienna, Budapest', 'Train pass included', 'Hostel accommodation'], price: '$$' },
+                { type: 'Activity', title: 'Mountain Hiking', desc: 'Swiss Alps hiking experience', img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800', details: ['Full day trek', 'Professional guide', 'Lunch included', 'Scenic cable car ride'], price: '$$' },
+                { type: 'City', title: 'New York, USA', desc: 'The city that never sleeps', img: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=800', details: ['Times Square', 'Central Park walks', 'Broadway shows', 'Brooklyn Bridge'], price: '$$$' },
+                { type: 'Activity', title: 'Scuba Diving', desc: 'Great Barrier Reef adventure', img: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800', details: ['2 dive sites', 'All equipment provided', 'Lunch on boat', 'Certified instructor'], price: '$$$' },
               ].map((item, idx) => (
                 <div
                   key={idx}
-                  className="masonry-item glass border border-white/10 rounded-2xl overflow-hidden hover:border-white/30 hover:shadow-2xl hover:shadow-white/10 transition-all duration-300 cursor-pointer group"
+                  className="masonry-item glass border border-white/10 rounded-2xl overflow-hidden hover:border-white/30 hover:shadow-2xl hover:shadow-white/10 transition-all duration-300 cursor-pointer group relative"
                   style={{ animationDelay: `${idx * 50}ms` }}
                 >
                   {item.img && (
                     <div className="aspect-[4/3] bg-gradient-to-br from-white/10 to-white/5 relative overflow-hidden">
+                      <img src={item.img} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                       <div className="absolute bottom-3 left-3 text-xs px-2 py-1 bg-white/20 backdrop-blur-md rounded-full border border-white/20">
                         {item.type}
+                      </div>
+                      {/* Hover Details Overlay */}
+                      <div className="absolute inset-0 bg-black/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex flex-col justify-center">
+                        <div className="text-xs uppercase tracking-wider text-white/70 mb-2">{item.type}</div>
+                        <h4 className="text-lg font-bold text-white mb-3">{item.title}</h4>
+                        <div className="space-y-1.5 mb-3">
+                          {item.details.map((detail, i) => (
+                            <div key={i} className="flex items-start gap-2 text-sm text-white/80">
+                              <span className="text-white/50 mt-0.5">•</span>
+                              <span>{detail}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between mt-auto pt-3 border-t border-white/10">
+                          <span className="text-xs text-white/60">Price Range</span>
+                          <span className="text-sm font-semibold text-white">{item.price}</span>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -223,6 +259,16 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
                       {item.title}
                     </h3>
                     <p className="text-sm text-white/60 line-clamp-2">{item.desc}</p>
+                    {!item.img && (
+                      <div className="mt-3 space-y-1">
+                        {item.details.slice(0, 2).map((detail, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs text-white/50">
+                            <span>•</span>
+                            <span>{detail}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
