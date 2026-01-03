@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { User, Trip } from '@/types';
-import { LoginScreen, RegisterScreen, CreateTrip } from '@/pages';
+import { LoginScreen, RegisterScreen, CreateTrip, MyTrips } from '@/pages';
 import Navigation from '@/components/Navigation';
 import Dashboard from '@/components/Dashboard';
 
@@ -89,6 +89,19 @@ function App() {
               currentUser ? (
                 <div className="max-w-7xl mx-auto px-6 py-24">
                   <CreateTrip userId={currentUser.id} />
+                </div>
+              ) : (
+                <Navigate to="/" replace />
+              )
+            } 
+          />
+          
+          <Route 
+            path="/my-trips" 
+            element={
+              currentUser ? (
+                <div className="max-w-7xl mx-auto px-6 py-24">
+                  <MyTrips trips={trips} setTrips={setTrips} />
                 </div>
               ) : (
                 <Navigate to="/" replace />
